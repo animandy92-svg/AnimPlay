@@ -1,0 +1,333 @@
+import { Server as SocketServer, Socket } from 'socket.io';
+import { getDb } from '../db';
+import { calculatePoints } from '../utils/scoring';
+import type { GameRoom, Player, PlayerAnswer, LeaderboardEntry, QuestionWithOptions, QuizDetail } from '../../shared/types';
+
+const gameRooms = new Map<string, GameRoom>();
+const socketToGame = new Map<string, string>();
+
+export function getGameByPin(pin: string): GameRoom | undefined {
+  return gameRooms.get(pin);
+}
+
+export function setupGameSocket(io: SocketServer) {
+  io.on('connection', (socket: Socket) => {
+    console.log(`Client connected: ${socket.id}`);
+
+    socket.on('join-game', (data: { gamePin: string; nickname: string }) => {
+      const { gamePin, nickname } = data;
+
+      const db = getDb();
+      const game = db.prepare(`
+        SELECT g.*, q.id as qid
+        FROM games g
+        JOIN quizzes q ON q.id = g.quiz_id
+        WHERE g.game_pin = ? AND g.status = 'lobby'
+      `).get(gamePin) as any;
+
+      if (!game) {
+        socket.emit('error', { message: 'Game not found or already started' });
+        return;
+      }
+
+      let room = gameRooms.get(gamePin);
+
+      if (!room) {
+        const questions = db.prepare(`
+          SELECT * FROM questions WHERE quiz_id = ? ORDER BY sort_order
+        `).all(game.quiz_id) as QuestionWithOptions[];
+
+        for (const q of questions) {
+          q.answers = db.prepare('SELECT * FROM answers WHERE question_id = ? ORDER BY sort_index').all(q.id) as any[];
+        }
+
+        const quiz: QuizDetail = {
+          id: game.quiz_id,
+          host_id: game.host_id,
+          title: game.qid ? '' : '',
+          description: '',
+          cover_image: null,
+          is_public: true,
+          created_at: '',
+          updated_at: '',
+          questions,
+        };
+
+        const quizData = db.prepare('SELECT * FROM quizzes WHERE id = ?').get(game.quiz_id) as any;
+        quiz.title = quizData.title;
+        quiz.description = quizData.description;
+
+        room = {
+          gameId: game.id,
+          gamePin,
+          quizId: game.quiz_id,
+          hostId: game.host_id,
+          hostSocketId: '',
+          status: 'lobby',
+          currentQuestionIndex: 0,
+          players: new Map(),
+          quiz,
+          startedAt: new Date(),
+        };
+        gameRooms.set(gamePin, room);
+      }
+
+      const playerId = `player_${socket.id}_${Date.now()}`;
+      const player: Player = {
+        id: playerId,
+        nickname,
+        socketId: socket.id,
+        score: 0,
+        streak: 0,
+        correctCount: 0,
+        answers: [],
+      };
+
+      room.players.set(playerId, player);
+      socketToGame.set(socket.id, gamePin);
+
+      socket.join(gamePin);
+
+      socket.emit('answer-confirmed', { accepted: true, playerId });
+      io.to(gamePin).emit('player-joined', {
+        playerId,
+        nickname,
+        playerCount: room.players.size,
+      });
+
+      console.log(`Player "${nickname}" joined game ${gamePin}. Total: ${room.players.size}`);
+    });
+
+    socket.on('host-register', (data: { gamePin: string; hostId: number }) => {
+      const room = gameRooms.get(data.gamePin);
+      if (room && room.hostId === data.hostId) {
+        room.hostSocketId = socket.id;
+        socketToGame.set(socket.id, data.gamePin);
+        socket.join(data.gamePin);
+        console.log(`Host registered for game ${data.gamePin}`);
+      }
+    });
+
+    socket.on('host-start-game', (data: { gameId: number }) => {
+      const gamePin = socketToGame.get(socket.id);
+      if (!gamePin) return;
+
+      const room = gameRooms.get(gamePin);
+      if (!room || room.hostSocketId !== socket.id) return;
+
+      room.status = 'active';
+      room.startedAt = new Date();
+
+      const db = getDb();
+      db.prepare('UPDATE games SET status = ?, started_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .run('active', room.gameId);
+
+      io.to(gamePin).emit('game-started', {
+        totalQuestions: room.quiz.questions.length,
+      });
+
+      sendQuestion(room, io);
+    });
+
+    socket.on('answer-submitted', (data: {
+      gameId: number;
+      questionId: number;
+      answerIndex: number;
+      responseTimeMs: number;
+    }) => {
+      const gamePin = socketToGame.get(socket.id);
+      if (!gamePin) return;
+
+      const room = gameRooms.get(gamePin);
+      if (!room || room.status !== 'active') return;
+
+      const player = Array.from(room.players.values()).find(p => p.socketId === socket.id);
+      if (!player) return;
+
+      const alreadyAnswered = player.answers.some(a => a.questionId === data.questionId);
+      if (alreadyAnswered) {
+        socket.emit('answer-confirmed', { accepted: false });
+        return;
+      }
+
+      const currentQuestion = room.quiz.questions[room.currentQuestionIndex];
+      if (!currentQuestion || currentQuestion.id !== data.questionId) return;
+
+      const isCorrect = data.answerIndex === currentQuestion.correct_index;
+      let pointsEarned = 0;
+      let newStreak = player.streak;
+
+      if (isCorrect) {
+        newStreak = player.streak + 1;
+        const scoring = calculatePoints(
+          currentQuestion.timer_seconds,
+          data.responseTimeMs,
+          currentQuestion.points,
+          player.streak
+        );
+        pointsEarned = scoring.points;
+      } else {
+        newStreak = 0;
+      }
+
+      const answer: PlayerAnswer = {
+        questionId: data.questionId,
+        answerIndex: data.answerIndex,
+        responseTimeMs: data.responseTimeMs,
+        isCorrect,
+        pointsEarned,
+      };
+
+      player.answers.push(answer);
+      player.score += pointsEarned;
+      player.streak = newStreak;
+      if (isCorrect) player.correctCount++;
+
+      socket.emit('answer-confirmed', { accepted: true });
+
+      console.log(`Player "${player.nickname}" answered Q${data.questionId}: ${isCorrect ? 'CORRECT' : 'WRONG'} (+${pointsEarned}pts)`);
+    });
+
+    socket.on('host-next-question', (data: { gameId: number }) => {
+      const gamePin = socketToGame.get(socket.id);
+      if (!gamePin) return;
+
+      const room = gameRooms.get(gamePin);
+      if (!room || room.hostSocketId !== socket.id) return;
+
+      room.currentQuestionIndex++;
+
+      if (room.currentQuestionIndex >= room.quiz.questions.length) {
+        endGame(room, io);
+        return;
+      }
+
+      sendQuestion(room, io);
+    });
+
+    socket.on('host-end-game', (data: { gameId: number }) => {
+      const gamePin = socketToGame.get(socket.id);
+      if (!gamePin) return;
+
+      const room = gameRooms.get(gamePin);
+      if (!room || room.hostSocketId !== socket.id) return;
+
+      endGame(room, io);
+    });
+
+    socket.on('disconnect', () => {
+      const gamePin = socketToGame.get(socket.id);
+      if (!gamePin) return;
+
+      const room = gameRooms.get(gamePin);
+      if (!room) return;
+
+      if (room.hostSocketId === socket.id) {
+        console.log(`Host disconnected from game ${gamePin}`);
+      } else {
+        const player = Array.from(room.players.values()).find(p => p.socketId === socket.id);
+        if (player) {
+          room.players.delete(player.id);
+          io.to(gamePin).emit('player-left', {
+            playerId: player.id,
+            nickname: player.nickname,
+            playerCount: room.players.size,
+          });
+          console.log(`Player "${player.nickname}" left game ${gamePin}. Total: ${room.players.size}`);
+        }
+      }
+
+      socketToGame.delete(socket.id);
+    });
+  });
+}
+
+function sendQuestion(room: GameRoom, io: SocketServer) {
+  const question = room.quiz.questions[room.currentQuestionIndex];
+  if (!question) return;
+
+  const startsAt = Date.now() + 1000;
+  room.questionStartTime = startsAt;
+
+  io.to(room.gamePin).emit('question-started', {
+    questionId: question.id,
+    questionText: question.question_text,
+    answers: question.answers.map(a => ({ text: a.text, color: a.color })),
+    timer: question.timer_seconds,
+    startsAt,
+    questionIndex: room.currentQuestionIndex,
+    totalQuestions: room.quiz.questions.length,
+  });
+
+  const timerMs = question.timer_seconds * 1000;
+  setTimeout(() => {
+    showQuestionResults(room, io);
+  }, timerMs + 1500);
+}
+
+function showQuestionResults(room: GameRoom, io: SocketServer) {
+  const question = room.quiz.questions[room.currentQuestionIndex];
+  if (!question) return;
+
+  const stats = [0, 0, 0, 0];
+  for (const player of room.players.values()) {
+    const answer = player.answers.find(a => a.questionId === question.id);
+    if (answer) {
+      stats[answer.answerIndex]++;
+    }
+  }
+
+  const leaderboard = getLeaderboard(room);
+
+  io.to(room.gamePin).emit('question-ended', {
+    correctIndex: question.correct_index,
+    stats: stats.map((count, answerIndex) => ({ answerIndex, count })),
+    leaderboard,
+  });
+}
+
+function endGame(room: GameRoom, io: SocketServer) {
+  room.status = 'finished';
+
+  const db = getDb();
+  db.prepare('UPDATE games SET status = ?, ended_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .run('finished', room.gameId);
+
+  const leaderboard = getLeaderboard(room);
+
+  const insertResult = db.prepare(
+    'INSERT INTO game_results (game_id, nickname, score, correct, total, streak, rank) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  );
+
+  for (const entry of leaderboard) {
+    const player = Array.from(room.players.values()).find(p => p.nickname === entry.nickname);
+    insertResult.run(
+      room.gameId,
+      entry.nickname,
+      entry.score,
+      entry.correct,
+      room.quiz.questions.length,
+      entry.streak,
+      entry.rank
+    );
+  }
+
+  io.to(room.gamePin).emit('game-ended', { finalRankings: leaderboard });
+
+  setTimeout(() => {
+    gameRooms.delete(room.gamePin);
+  }, 60000);
+}
+
+function getLeaderboard(room: GameRoom): LeaderboardEntry[] {
+  const players = Array.from(room.players.values());
+  players.sort((a, b) => b.score - a.score);
+
+  return players.map((player, index) => ({
+    rank: index + 1,
+    nickname: player.nickname,
+    score: player.score,
+    correct: player.correctCount,
+    streak: player.streak,
+  }));
+}
