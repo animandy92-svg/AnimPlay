@@ -1,0 +1,326 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getGameByPin = getGameByPin;
+exports.setupGameSocket = setupGameSocket;
+const db_1 = require("../db");
+const scoring_1 = require("../utils/scoring");
+const gameRooms = new Map();
+const socketToGame = new Map();
+function getGameByPin(pin) {
+    return gameRooms.get(pin);
+}
+function setupGameSocket(io) {
+    io.on('connection', (socket) => {
+        console.log(`Client connected: ${socket.id}`);
+        socket.on('join-game', (data) => {
+            const { gamePin, nickname } = data;
+            const db = (0, db_1.getDb)();
+            const game = db.prepare(`
+        SELECT g.*, q.id as qid
+        FROM games g
+        JOIN quizzes q ON q.id = g.quiz_id
+        WHERE g.game_pin = ? AND g.status = 'lobby'
+      `).get(gamePin);
+            if (!game) {
+                socket.emit('error', { message: 'Game not found or already started' });
+                return;
+            }
+            let room = gameRooms.get(gamePin);
+            if (!room) {
+                const questions = db.prepare(`
+          SELECT * FROM questions WHERE quiz_id = ? ORDER BY sort_order
+        `).all(game.quiz_id);
+                for (const q of questions) {
+                    q.answers = db.prepare('SELECT * FROM answers WHERE question_id = ? ORDER BY sort_index').all(q.id);
+                }
+                const quiz = {
+                    id: game.quiz_id,
+                    host_id: game.host_id,
+                    title: '',
+                    description: '',
+                    cover_image: null,
+                    is_public: true,
+                    created_at: '',
+                    updated_at: '',
+                    questions,
+                };
+                const quizData = db.prepare('SELECT * FROM quizzes WHERE id = ?').get(game.quiz_id);
+                quiz.title = quizData.title;
+                quiz.description = quizData.description;
+                room = {
+                    gameId: game.id,
+                    gamePin,
+                    quizId: game.quiz_id,
+                    hostId: game.host_id,
+                    hostSocketId: '',
+                    status: 'lobby',
+                    currentQuestionIndex: 0,
+                    players: new Map(),
+                    quiz,
+                    startedAt: new Date(),
+                };
+                gameRooms.set(gamePin, room);
+            }
+            const playerId = `player_${socket.id}_${Date.now()}`;
+            const player = {
+                id: playerId,
+                nickname,
+                socketId: socket.id,
+                score: 0,
+                streak: 0,
+                correctCount: 0,
+                hasAnswered: false,
+                answers: [],
+            };
+            room.players.set(playerId, player);
+            socketToGame.set(socket.id, gamePin);
+            socket.join(gamePin);
+            socket.emit('answer-confirmed', { accepted: true, playerId });
+            io.to(gamePin).emit('player-joined', {
+                playerId,
+                nickname,
+                playerCount: room.players.size,
+            });
+            console.log(`Player "${nickname}" joined game ${gamePin}. Total: ${room.players.size}`);
+        });
+        socket.on('host-register', (data) => {
+            const room = gameRooms.get(data.gamePin);
+            if (room && room.hostId === data.hostId) {
+                room.hostSocketId = socket.id;
+                socketToGame.set(socket.id, data.gamePin);
+                socket.join(data.gamePin);
+                console.log(`Host registered for game ${data.gamePin}`);
+            }
+        });
+        socket.on('host-start-game', (data) => {
+            const gamePin = socketToGame.get(socket.id);
+            if (!gamePin)
+                return;
+            const room = gameRooms.get(gamePin);
+            if (!room || room.hostSocketId !== socket.id)
+                return;
+            room.status = 'active';
+            room.startedAt = new Date();
+            const db = (0, db_1.getDb)();
+            db.prepare('UPDATE games SET status = ?, started_at = CURRENT_TIMESTAMP WHERE id = ?')
+                .run('active', room.gameId);
+            io.to(gamePin).emit('game-started', {
+                totalQuestions: room.quiz.questions.length,
+            });
+            sendQuestion(room, io);
+        });
+        socket.on('answer-submitted', (data) => {
+            const gamePin = socketToGame.get(socket.id);
+            if (!gamePin)
+                return;
+            const room = gameRooms.get(gamePin);
+            if (!room || room.status !== 'active')
+                return;
+            const player = Array.from(room.players.values()).find(p => p.socketId === socket.id);
+            if (!player)
+                return;
+            const alreadyAnswered = player.answers.some(a => a.questionId === data.questionId);
+            if (alreadyAnswered) {
+                socket.emit('answer-confirmed', { accepted: false });
+                return;
+            }
+            const currentQuestion = room.quiz.questions[room.currentQuestionIndex];
+            if (!currentQuestion || currentQuestion.id !== data.questionId)
+                return;
+            const isCorrect = data.answerIndex === currentQuestion.correct_index;
+            let pointsEarned = 0;
+            let newStreak = player.streak;
+            if (isCorrect) {
+                newStreak = player.streak + 1;
+                const scoring = (0, scoring_1.calculatePoints)(currentQuestion.timer_seconds, data.responseTimeMs, currentQuestion.points, player.streak);
+                pointsEarned = scoring.points;
+            }
+            else {
+                newStreak = 0;
+            }
+            const answer = {
+                questionId: data.questionId,
+                answerIndex: data.answerIndex,
+                responseTimeMs: data.responseTimeMs,
+                isCorrect,
+                pointsEarned,
+            };
+            player.answers.push(answer);
+            player.score += pointsEarned;
+            player.streak = newStreak;
+            player.hasAnswered = true;
+            if (isCorrect)
+                player.correctCount++;
+            socket.emit('answer-confirmed', { accepted: true });
+            const answeredCount = Array.from(room.players.values()).filter(p => p.hasAnswered).length;
+            io.to(room.hostSocketId).emit('answer-received', {
+                answeredCount,
+                totalCount: room.players.size,
+            });
+            console.log(`Player "${player.nickname}" answered Q${data.questionId}: ${isCorrect ? 'CORRECT' : 'WRONG'} (+${pointsEarned}pts)`);
+            checkIfAllAnswered(room, io);
+        });
+        socket.on('host-next-question', (data) => {
+            const gamePin = socketToGame.get(socket.id);
+            if (!gamePin)
+                return;
+            const room = gameRooms.get(gamePin);
+            if (!room || room.hostSocketId !== socket.id)
+                return;
+            room.currentQuestionIndex++;
+            if (room.currentQuestionIndex >= room.quiz.questions.length) {
+                endGame(room, io);
+                return;
+            }
+            sendQuestion(room, io);
+        });
+        socket.on('host-end-game', (data) => {
+            const gamePin = socketToGame.get(socket.id);
+            if (!gamePin)
+                return;
+            const room = gameRooms.get(gamePin);
+            if (!room || room.hostSocketId !== socket.id)
+                return;
+            endGame(room, io);
+        });
+        socket.on('disconnect', () => {
+            const gamePin = socketToGame.get(socket.id);
+            if (!gamePin)
+                return;
+            const room = gameRooms.get(gamePin);
+            if (!room)
+                return;
+            if (room.hostSocketId === socket.id) {
+                console.log(`Host disconnected from game ${gamePin}`);
+            }
+            else {
+                const player = Array.from(room.players.values()).find(p => p.socketId === socket.id);
+                if (player) {
+                    room.players.delete(player.id);
+                    io.to(gamePin).emit('player-left', {
+                        playerId: player.id,
+                        nickname: player.nickname,
+                        playerCount: room.players.size,
+                    });
+                    console.log(`Player "${player.nickname}" left game ${gamePin}. Total: ${room.players.size}`);
+                }
+            }
+            socketToGame.delete(socket.id);
+        });
+    });
+}
+function sendQuestion(room, io) {
+    const question = room.quiz.questions[room.currentQuestionIndex];
+    if (!question)
+        return;
+    clearQuestionTimers(room);
+    for (const player of room.players.values()) {
+        player.hasAnswered = false;
+    }
+    const startsAt = Date.now() + 1000;
+    room.questionStartTime = startsAt;
+    io.to(room.hostSocketId).emit('host-question-start', {
+        questionId: question.id,
+        questionText: question.question_text,
+        answers: question.answers.map(a => ({ text: a.text, color: a.color })),
+        timer: question.timer_seconds,
+        startsAt,
+        questionIndex: room.currentQuestionIndex,
+        totalQuestions: room.quiz.questions.length,
+    });
+    for (const player of room.players.values()) {
+        io.to(player.socketId).emit('player-question-start', {
+            questionId: question.id,
+            answerCount: question.answers.length,
+            timer: question.timer_seconds,
+            startsAt,
+            questionIndex: room.currentQuestionIndex,
+            totalQuestions: room.quiz.questions.length,
+        });
+    }
+    const timerMs = question.timer_seconds * 1000;
+    room.questionTimerInterval = setInterval(() => {
+        const elapsed = Date.now() - startsAt;
+        const timeLeft = Math.max(0, Math.ceil((timerMs - elapsed) / 1000));
+        io.to(room.gamePin).emit('timer-tick', { timeLeft });
+        if (timeLeft <= 0) {
+            clearQuestionTimers(room);
+            io.to(room.gamePin).emit('time-up');
+            showQuestionResults(room, io);
+        }
+    }, 1000);
+    room.questionTimeout = setTimeout(() => {
+        clearQuestionTimers(room);
+        io.to(room.gamePin).emit('time-up');
+        showQuestionResults(room, io);
+    }, timerMs + 1500);
+}
+function clearQuestionTimers(room) {
+    if (room.questionTimerInterval) {
+        clearInterval(room.questionTimerInterval);
+        room.questionTimerInterval = undefined;
+    }
+    if (room.questionTimeout) {
+        clearTimeout(room.questionTimeout);
+        room.questionTimeout = undefined;
+    }
+}
+function checkIfAllAnswered(room, io) {
+    if (room.players.size === 0)
+        return;
+    const allAnswered = Array.from(room.players.values()).every(p => p.hasAnswered);
+    if (!allAnswered)
+        return;
+    clearQuestionTimers(room);
+    io.to(room.gamePin).emit('time-up');
+    setTimeout(() => {
+        showQuestionResults(room, io);
+    }, 1500);
+}
+function showQuestionResults(room, io) {
+    const question = room.quiz.questions[room.currentQuestionIndex];
+    if (!question)
+        return;
+    const stats = [0, 0, 0, 0];
+    for (const player of room.players.values()) {
+        const answer = player.answers.find(a => a.questionId === question.id);
+        if (answer) {
+            stats[answer.answerIndex]++;
+        }
+    }
+    const leaderboard = getLeaderboard(room);
+    io.to(room.gamePin).emit('question-ended', {
+        correctIndex: question.correct_index,
+        stats: stats.map((count, answerIndex) => ({ answerIndex, count })),
+        leaderboard,
+    });
+}
+function endGame(room, io) {
+    clearQuestionTimers(room);
+    room.status = 'finished';
+    const db = (0, db_1.getDb)();
+    db.prepare('UPDATE games SET status = ?, ended_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .run('finished', room.gameId);
+    const leaderboard = getLeaderboard(room);
+    const insertResult = db.prepare('INSERT INTO game_results (game_id, nickname, score, correct, total, streak, rank) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    for (const entry of leaderboard) {
+        const player = Array.from(room.players.values()).find(p => p.nickname === entry.nickname);
+        insertResult.run(room.gameId, entry.nickname, entry.score, entry.correct, room.quiz.questions.length, entry.streak, entry.rank);
+    }
+    io.to(room.gamePin).emit('game-ended', { finalRankings: leaderboard });
+    setTimeout(() => {
+        gameRooms.delete(room.gamePin);
+    }, 60000);
+}
+function getLeaderboard(room) {
+    const players = Array.from(room.players.values());
+    players.sort((a, b) => b.score - a.score);
+    return players.map((player, index) => ({
+        rank: index + 1,
+        nickname: player.nickname,
+        score: player.score,
+        correct: player.correctCount,
+        streak: player.streak,
+    }));
+}
+//# sourceMappingURL=gameSocket.js.map

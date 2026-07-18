@@ -35,7 +35,7 @@ export default function PlayerGame() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [myScore, setMyScore] = useState(0);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<number | null>(null);
   const navigate = useNavigate();
   const { emit, on } = useSocket();
 
