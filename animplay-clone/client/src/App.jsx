@@ -1,34 +1,27 @@
-import { useEffect, useState } from 'react';
-import { io } from 'socket.io-client';
+import { useState } from 'react';
+import HostScreen from './HostScreen.jsx';
+import PlayerScreen from './PlayerScreen.jsx';
 
 function App() {
-  const [status, setStatus] = useState('Connecting to server...');
-
-  useEffect(() => {
-    const socket = io('http://localhost:3001');
-
-    socket.on('connect', () => {
-      setStatus(`Connected as ${socket.id}`);
-    });
-
-    socket.on('disconnect', () => {
-      setStatus('Disconnected from server');
-    });
-
-    socket.on('connect_error', () => {
-      setStatus('Unable to connect to server');
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
+  const [mode, setMode] = useState('HOST');
 
   return (
-    <div style={{ fontFamily: 'sans-serif', padding: 24 }}>
-      <h1>AnimPlay Clone</h1>
-      <p>{status}</p>
-      <p>Open the server at <code>http://localhost:3001</code> and the client at <code>http://localhost:5173</code>.</p>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'center', padding: 20, gap: 12 }}>
+        <button
+          onClick={() => setMode('HOST')}
+          style={{ padding: 12, cursor: 'pointer', backgroundColor: mode === 'HOST' ? '#46178f' : '#eee', color: mode === 'HOST' ? '#fff' : '#000', border: 'none', borderRadius: 4 }}
+        >
+          Host
+        </button>
+        <button
+          onClick={() => setMode('PLAYER')}
+          style={{ padding: 12, cursor: 'pointer', backgroundColor: mode === 'PLAYER' ? '#46178f' : '#eee', color: mode === 'PLAYER' ? '#fff' : '#000', border: 'none', borderRadius: 4 }}
+        >
+          Player
+        </button>
+      </div>
+      {mode === 'HOST' ? <HostScreen /> : <PlayerScreen />}
     </div>
   );
 }
