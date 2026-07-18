@@ -5,14 +5,18 @@ export default {
     extend: {
       colors: {
         'animplay': {
-          'purple': '#46178F',
-          'purple-dark': '#2D0A5E',
-          'purple-light': '#6B3FA0',
+          'brand': '#0F766E',
+          'brand-dark': '#042F2E',
+          'brand-light': '#2DD4BF',
+          'nav': '#134E4A',
+          'accent': '#F97316',
+          'accent-dark': '#C2410C',
           'blue': '#1368CE',
           'red': '#E21B3C',
           'yellow': '#D89E00',
           'green': '#26890C',
           'orange': '#FF6B35',
+          'slate': '#1E293B',
         },
       },
       fontFamily: {

@@ -7,28 +7,98 @@ const router = Router();
 router.get('/', authenticateToken, (req: Request, res: Response) => {
   const db = getDb();
   const hostId = (req as any).hostId;
-  const quizzes = db.prepare(`
+  const tab = (req.query.tab as string) || 'recent';
+  const folderId = req.query.folderId as string | undefined;
+
+  let query = `
     SELECT q.*, COUNT(qu.id) as question_count
     FROM quizzes q
     LEFT JOIN questions qu ON qu.quiz_id = q.id
     WHERE q.host_id = ?
-    GROUP BY q.id
-    ORDER BY q.updated_at DESC
-  `).all(hostId);
+  `;
+  const params: (string | number)[] = [hostId];
+
+  if (tab === 'trash') {
+    query += ' AND q.deleted_at IS NOT NULL';
+  } else {
+    query += ' AND q.deleted_at IS NULL';
+    if (tab === 'drafts') query += " AND q.status = 'draft'";
+    else if (tab === 'favorites') query += ' AND q.is_favorite = 1';
+    else if (tab === 'shared') {
+      return res.json({ quizzes: [] });
+    }
+  }
+
+  if (folderId) {
+    query += ' AND q.id IN (SELECT quiz_id FROM quiz_folders WHERE folder_id = ?)';
+    params.push(folderId);
+  }
+
+  query += ' GROUP BY q.id ORDER BY q.updated_at DESC';
+
+  const quizzes = db.prepare(query).all(...params);
   res.json({ quizzes });
 });
 
 router.post('/', authenticateToken, (req: Request, res: Response) => {
   const db = getDb();
   const hostId = (req as any).hostId;
-  const { title, description } = req.body;
+  const { title, description, status, is_public } = req.body;
 
   if (!title) {
     return res.status(400).json({ error: 'Title is required' });
   }
 
-  const result = db.prepare('INSERT INTO quizzes (host_id, title, description) VALUES (?, ?, ?)').run(hostId, title, description || '');
+  const result = db.prepare(
+    'INSERT INTO quizzes (host_id, title, description, status, is_public) VALUES (?, ?, ?, ?, ?)'
+  ).run(hostId, title, description || '', status || 'draft', is_public ? 1 : 0);
+
   res.json({ quiz: { id: result.lastInsertRowid, title, description } });
+});
+
+router.post('/:id/clone', authenticateToken, (req: Request, res: Response) => {
+  const db = getDb();
+  const hostId = (req as any).hostId;
+  const sourceId = req.params.id;
+
+  const source = db.prepare('SELECT * FROM quizzes WHERE id = ? AND is_public = 1').get(sourceId) as any;
+  if (!source) {
+    return res.status(404).json({ error: 'Public quiz not found' });
+  }
+
+  const result = db.prepare(
+    'INSERT INTO quizzes (host_id, title, description, is_public, category, status) VALUES (?, ?, ?, 0, ?, ?)'
+  ).run(hostId, `${source.title} (copy)`, source.description, source.category || 'general', 'published');
+
+  const newQuizId = result.lastInsertRowid;
+  const questions = db.prepare('SELECT * FROM questions WHERE quiz_id = ? ORDER BY sort_order').all(sourceId) as any[];
+
+  for (const q of questions) {
+    const qResult = db.prepare(
+      'INSERT INTO questions (quiz_id, question_text, timer_seconds, points, sort_order, correct_index) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(newQuizId, q.question_text, q.timer_seconds, q.points, q.sort_order, q.correct_index);
+
+    const answers = db.prepare('SELECT * FROM answers WHERE question_id = ? ORDER BY sort_index').all(q.id) as any[];
+    const insertA = db.prepare('INSERT INTO answers (question_id, sort_index, text, color) VALUES (?, ?, ?, ?)');
+    for (const a of answers) {
+      insertA.run(qResult.lastInsertRowid, a.sort_index, a.text, a.color);
+    }
+  }
+
+  db.prepare('UPDATE quizzes SET play_count = play_count + 1 WHERE id = ?').run(sourceId);
+  res.json({ quiz: { id: newQuizId, title: `${source.title} (copy)` } });
+});
+
+router.post('/:id/restore', authenticateToken, (req: Request, res: Response) => {
+  const db = getDb();
+  const hostId = (req as any).hostId;
+  const quizId = req.params.id;
+
+  const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND host_id = ?').get(quizId, hostId);
+  if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+
+  db.prepare('UPDATE quizzes SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(quizId);
+  res.json({ success: true });
 });
 
 router.get('/:id', authenticateToken, (req: Request, res: Response) => {
@@ -54,15 +124,30 @@ router.put('/:id', authenticateToken, (req: Request, res: Response) => {
   const db = getDb();
   const hostId = (req as any).hostId;
   const quizId = req.params.id;
-  const { title, description } = req.body;
+  const { title, description, status, is_public, is_favorite, folderId } = req.body;
 
   const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND host_id = ?').get(quizId, hostId);
   if (!quiz) {
     return res.status(404).json({ error: 'Quiz not found' });
   }
 
-  db.prepare('UPDATE quizzes SET title = COALESCE(?, title), description = COALESCE(?, description), updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-    .run(title, description, quizId);
+  db.prepare(`
+    UPDATE quizzes SET
+      title = COALESCE(?, title),
+      description = COALESCE(?, description),
+      status = COALESCE(?, status),
+      is_public = COALESCE(?, is_public),
+      is_favorite = COALESCE(?, is_favorite),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(title, description, status, is_public !== undefined ? (is_public ? 1 : 0) : null, is_favorite !== undefined ? (is_favorite ? 1 : 0) : null, quizId);
+
+  if (folderId !== undefined) {
+    db.prepare('DELETE FROM quiz_folders WHERE quiz_id = ?').run(quizId);
+    if (folderId) {
+      db.prepare('INSERT INTO quiz_folders (quiz_id, folder_id) VALUES (?, ?)').run(quizId, folderId);
+    }
+  }
 
   res.json({ success: true });
 });
@@ -71,13 +156,19 @@ router.delete('/:id', authenticateToken, (req: Request, res: Response) => {
   const db = getDb();
   const hostId = (req as any).hostId;
   const quizId = req.params.id;
+  const permanent = req.query.permanent === 'true';
 
   const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND host_id = ?').get(quizId, hostId);
   if (!quiz) {
     return res.status(404).json({ error: 'Quiz not found' });
   }
 
-  db.prepare('DELETE FROM quizzes WHERE id = ?').run(quizId);
+  if (permanent) {
+    db.prepare('DELETE FROM quizzes WHERE id = ?').run(quizId);
+  } else {
+    db.prepare('UPDATE quizzes SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?').run(quizId);
+  }
+
   res.json({ success: true });
 });
 
@@ -111,6 +202,7 @@ router.post('/:id/questions', authenticateToken, (req: Request, res: Response) =
     insertAnswer.run(questionId, i, answers[i].text || answers[i], answers[i].color || colors[i]);
   }
 
+  db.prepare('UPDATE quizzes SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(quizId);
   res.json({ question: { id: questionId } });
 });
 
@@ -139,6 +231,7 @@ router.put('/:id/questions/:qid', authenticateToken, (req: Request, res: Respons
     }
   }
 
+  db.prepare('UPDATE quizzes SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(quizId);
   res.json({ success: true });
 });
 
@@ -154,6 +247,7 @@ router.delete('/:id/questions/:qid', authenticateToken, (req: Request, res: Resp
   }
 
   db.prepare('DELETE FROM questions WHERE id = ? AND quiz_id = ?').run(questionId, quizId);
+  db.prepare('UPDATE quizzes SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(quizId);
   res.json({ success: true });
 });
 

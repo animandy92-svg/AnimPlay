@@ -6,6 +6,11 @@ import { initializeDb } from './db';
 import authRoutes from './routes/auth';
 import quizRoutes from './routes/quizzes';
 import gameRoutes from './routes/games';
+import discoverRoutes from './routes/discover';
+import reportRoutes from './routes/reports';
+import groupRoutes from './routes/groups';
+import learningRoutes from './routes/learning';
+import folderRoutes from './routes/folders';
 import { setupGameSocket } from './socket/gameSocket';
 
 const PORT = process.env.PORT || 3001;
@@ -25,6 +30,11 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/games', gameRoutes);
+app.use('/api/discover', discoverRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/groups', groupRoutes);
+app.use('/api/learning', learningRoutes);
+app.use('/api/folders', folderRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
