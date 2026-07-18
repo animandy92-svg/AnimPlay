@@ -42,6 +42,12 @@ export default function JoinGame() {
       unsubError();
     });
 
+    const unsubJoinError = on('join-error', (data: { message: string }) => {
+      setError(data.message);
+      setJoining(false);
+      unsubJoinError();
+    });
+
     const unsubConfirm = on('answer-confirmed', (data: { accepted: boolean; playerId?: string; sessionId?: string }) => {
       if (data.accepted) {
         localStorage.setItem('animplay_nickname', nickname);
@@ -52,6 +58,7 @@ export default function JoinGame() {
         navigate('/game/lobby');
       }
       unsubError();
+      unsubJoinError();
       unsubConfirm();
     });
 

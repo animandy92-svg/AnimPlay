@@ -123,13 +123,15 @@ export interface SocketEvents {
   'host-end-game': (data: { gameId: number }) => void;
   'host-register': (data: { gamePin: string; hostId: number }) => void;
   'reconnect-player': (data: { sessionId: string; nickname: string; gamePin?: string }) => void;
+  'kick-player': (data: { gamePin: string; playerId: string }) => void;
 
   // Server -> Client
   'player-joined': (data: { playerId: string; nickname: string; playerCount: number }) => void;
   'player-left': (data: { playerId: string; nickname: string; playerCount: number }) => void;
   'player-reconnected': (data: { playerId: string; playerCount: number }) => void;
   'player-list': (data: { players: string[] }) => void;
-  'update-player-list': (data: { playerId: string; nickname: string; playerCount: number }[]) => void;
+  'update-player-list': (data: { playerId: string; nickname: string }[]) => void;
+  'kicked-from-game': (data: { message: string }) => void;
   'host-disconnected': () => void;
   'game-started': (data: { totalQuestions: number }) => void;
   'host-question-start': (data: { questionId: number; questionText: string; answers: { text: string; color: string }[]; timer: number; startsAt: number; questionIndex: number; totalQuestions: number }) => void;
@@ -140,5 +142,6 @@ export interface SocketEvents {
   'time-up': () => void;
   'question-ended': (data: { correctIndex: number; stats: { answerIndex: number; count: number }[]; leaderboard: LeaderboardEntry[] }) => void;
   'game-ended': (data: { finalRankings: LeaderboardEntry[] }) => void;
+  'join-error': (data: { message: string }) => void;
   'error': (data: { message: string }) => void;
 }

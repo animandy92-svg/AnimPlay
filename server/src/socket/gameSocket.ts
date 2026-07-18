@@ -4,6 +4,13 @@ import { getDb } from '../db';
 import { calculatePoints } from '../utils/scoring';
 import type { GameRoom, Player, PlayerAnswer, LeaderboardEntry, QuestionWithOptions, QuizDetail } from '../../../shared/types';
 
+const badWordsList = ['badword1', 'badword2', 'trollname']; // Extend this list
+
+function isSafeNickname(name: string) {
+  const cleanName = name.toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
+  return !badWordsList.some(word => cleanName.includes(word));
+}
+
 type ServerPlayer = Player & {
   disconnectTimeout?: ReturnType<typeof setTimeout>;
 };
@@ -25,6 +32,11 @@ export function setupGameSocket(io: SocketServer) {
 
     socket.on('join-game', (data: { gamePin: string; nickname: string }) => {
       const { gamePin, nickname } = data;
+      const MAX_PLAYERS = 100;
+
+      if (!isSafeNickname(nickname)) {
+        return socket.emit('join-error', { message: 'Please choose an appropriate nickname!' });
+      }
 
       const db = getDb();
       const game = db.prepare(`
@@ -81,6 +93,10 @@ export function setupGameSocket(io: SocketServer) {
         gameRooms.set(gamePin, room);
       }
 
+      if (room.players.size >= MAX_PLAYERS) {
+        return socket.emit('join-error', { message: 'This lobby is full!' });
+      }
+
       const sessionId = randomUUID();
       const playerId = `player_${socket.id}_${Date.now()}`;
       const player: ServerPlayer = {
@@ -120,6 +136,43 @@ export function setupGameSocket(io: SocketServer) {
         socketToGame.set(socket.id, data.gamePin);
         socket.join(data.gamePin);
         console.log(`Host registered for game ${data.gamePin}`);
+      }
+    });
+
+    socket.on('kick-player', (data: { gamePin: string; playerId: string }) => {
+      const { gamePin, playerId } = data;
+      const room = gameRooms.get(gamePin);
+      if (!room || room.hostSocketId !== socket.id) return;
+
+      const targetPlayer = room.players.get(playerId);
+      if (!targetPlayer) return;
+
+      const targetSocket = io.sockets.sockets.get(targetPlayer.socketId);
+      if (targetSocket) {
+        targetSocket.leave(gamePin);
+        targetSocket.emit('kicked-from-game', { message: 'You have been removed by the host.' });
+      }
+
+      room.players.delete(playerId);
+      if (targetPlayer.socketId) {
+        socketToGame.delete(targetPlayer.socketId);
+      }
+
+      io.to(gamePin).emit('player-left', {
+        playerId: targetPlayer.id,
+        nickname: targetPlayer.nickname,
+        playerCount: room.players.size,
+      });
+
+      if (room.hostSocketId) {
+        io.to(room.hostSocketId).emit('update-player-list', Array.from(room.players.values()).map(player => ({
+          playerId: player.id,
+          nickname: player.nickname,
+        })));
+      }
+
+      if (room.status === 'active') {
+        checkIfAllAnswered(room, io);
       }
     });
 

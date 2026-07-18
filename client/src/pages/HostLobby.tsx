@@ -2,8 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 
+interface HostPlayer {
+  playerId: string;
+  nickname: string;
+}
+
 export default function HostLobby() {
-  const [players, setPlayers] = useState<string[]>([]);
+  const [players, setPlayers] = useState<HostPlayer[]>([]);
   const [started, setStarted] = useState(false);
   const navigate = useNavigate();
   const { emit, on, connected } = useSocket();
@@ -26,13 +31,13 @@ export default function HostLobby() {
   useEffect(() => {
     const unsubPlayer = on('player-joined', (data: { playerId: string; nickname: string; playerCount: number }) => {
       setPlayers(prev => {
-        if (prev.includes(data.nickname)) return prev;
-        return [...prev, data.nickname];
+        if (prev.some(player => player.playerId === data.playerId)) return prev;
+        return [...prev, { playerId: data.playerId, nickname: data.nickname }];
       });
     });
 
     const unsubPlayerLeft = on('player-left', (data: { playerId: string; nickname: string; playerCount: number }) => {
-      setPlayers(prev => prev.filter(n => n !== data.nickname));
+      setPlayers(prev => prev.filter(player => player.playerId !== data.playerId));
     });
 
     const unsubStarted = on('game-started', () => {
@@ -40,8 +45,8 @@ export default function HostLobby() {
       navigate('/host/game');
     });
 
-    const unsubPlayerList = on('update-player-list', (updatedPlayers: { playerId: string; nickname: string; playerCount: number }[]) => {
-      setPlayers(updatedPlayers.map((player) => player.nickname));
+    const unsubPlayerList = on('update-player-list', (updatedPlayers: { playerId: string; nickname: string }[]) => {
+      setPlayers(updatedPlayers.map((player) => ({ playerId: player.playerId, nickname: player.nickname })));
     });
 
     return () => {
@@ -78,17 +83,24 @@ export default function HostLobby() {
         <div className="text-white/80 font-bold mb-3">
           Players ({players.length})
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col gap-2">
           {players.length === 0 ? (
             <div className="text-white/50">Waiting for players to join...</div>
           ) : (
-            players.map((p, i) => (
+            players.map((player, i) => (
               <div
-                key={p}
-                className="bg-white/20 text-white px-4 py-2 rounded-full font-bold animate-bounce-in"
+                key={player.playerId}
+                className="flex items-center justify-between gap-3 bg-white/10 text-white px-4 py-2 rounded-full font-bold animate-bounce-in"
                 style={{ animationDelay: `${i * 100}ms` }}
               >
-                {p}
+                <span>{player.nickname}</span>
+                <button
+                  type="button"
+                  onClick={() => emit('kick-player', { gamePin, playerId: player.playerId })}
+                  className="bg-red-500 hover:bg-red-600 text-white rounded-full px-3 py-1 text-sm"
+                >
+                  Kick
+                </button>
               </div>
             ))
           )}
