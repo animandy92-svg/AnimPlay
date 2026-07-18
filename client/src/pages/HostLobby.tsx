@@ -65,7 +65,7 @@ export default function HostLobby() {
           </div>
         </div>
         <p className="text-white/70 text-lg mt-4">
-          Go to <span className="font-bold text-white">localhost:5173</span> and enter this PIN
+          Go to the website and enter this PIN
         </p>
       </div>
 

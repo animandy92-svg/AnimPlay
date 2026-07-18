@@ -44,7 +44,7 @@ export function setupGameSocket(io: SocketServer) {
         const quiz: QuizDetail = {
           id: game.quiz_id,
           host_id: game.host_id,
-          title: game.qid ? '' : '',
+          title: '',
           description: '',
           cover_image: null,
           is_public: true,

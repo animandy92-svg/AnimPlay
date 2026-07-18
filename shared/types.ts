@@ -117,6 +117,7 @@ export interface SocketEvents {
   'host-start-game': (data: { gameId: number }) => void;
   'host-next-question': (data: { gameId: number }) => void;
   'host-end-game': (data: { gameId: number }) => void;
+  'host-register': (data: { gamePin: string; hostId: number }) => void;
 
   // Server -> Client
   'player-joined': (data: { playerId: string; nickname: string; playerCount: number }) => void;

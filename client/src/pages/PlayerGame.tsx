@@ -97,7 +97,7 @@ export default function PlayerGame() {
     const responseTimeMs = question.timer * 1000 - timeLeft * 1000;
 
     emit('answer-submitted', {
-      gameId: 0,
+      gameId: Number(localStorage.getItem('animplay_gameId') || 0),
       questionId: question.questionId,
       answerIndex,
       responseTimeMs,

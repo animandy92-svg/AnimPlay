@@ -8,6 +8,8 @@ export default {
           'brand': '#0F766E',
           'brand-dark': '#042F2E',
           'brand-light': '#2DD4BF',
+          'purple': '#7C3AED',
+          'purple-dark': '#5B21B6',
           'nav': '#134E4A',
           'accent': '#F97316',
           'accent-dark': '#C2410C',

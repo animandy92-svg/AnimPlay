@@ -38,7 +38,13 @@ export const api = {
     me: () => request('/auth/me'),
   },
   quizzes: {
-    list: () => request('/quizzes'),
+    list: (tab?: string, folderId?: number) => {
+      const params = new URLSearchParams();
+      if (tab) params.set('tab', tab);
+      if (folderId) params.set('folderId', folderId.toString());
+      const qs = params.toString();
+      return request(`/quizzes${qs ? `?${qs}` : ''}`);
+    },
     get: (id: number) => request(`/quizzes/${id}`),
     create: (title: string, description?: string) =>
       request('/quizzes', { method: 'POST', body: JSON.stringify({ title, description }) }),
@@ -46,6 +52,12 @@ export const api = {
       request(`/quizzes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: number) =>
       request(`/quizzes/${id}`, { method: 'DELETE' }),
+    permanentDelete: (id: number) =>
+      request(`/quizzes/${id}?permanent=true`, { method: 'DELETE' }),
+    restore: (id: number) =>
+      request(`/quizzes/${id}/restore`, { method: 'POST' }),
+    clone: (id: number) =>
+      request(`/quizzes/${id}/clone`, { method: 'POST' }),
     addQuestion: (quizId: number, question: any) =>
       request(`/quizzes/${quizId}/questions`, { method: 'POST', body: JSON.stringify(question) }),
     updateQuestion: (quizId: number, questionId: number, question: any) =>
@@ -58,5 +70,53 @@ export const api = {
       request('/games/start', { method: 'POST', body: JSON.stringify({ quizId }) }),
     get: (pin: string) => request(`/games/${pin}`),
     getResults: (pin: string) => request(`/games/${pin}/results`),
+  },
+  discover: {
+    categories: () => request('/discover/categories'),
+    quizzes: (params: { search?: string; category?: string; sort?: string }) => {
+      const sp = new URLSearchParams();
+      if (params.search) sp.set('search', params.search);
+      if (params.category) sp.set('category', params.category);
+      if (params.sort) sp.set('sort', params.sort);
+      const qs = sp.toString();
+      return request(`/discover/quizzes${qs ? `?${qs}` : ''}`);
+    },
+    play: (quizId: number) =>
+      request(`/discover/${quizId}/play`, { method: 'POST' }),
+  },
+  folders: {
+    list: () => request('/folders'),
+    create: (name: string) =>
+      request('/folders', { method: 'POST', body: JSON.stringify({ name }) }),
+    delete: (id: number) =>
+      request(`/folders/${id}`, { method: 'DELETE' }),
+  },
+  groups: {
+    list: (tab: 'joined' | 'owned' = 'joined') =>
+      request(`/groups?tab=${tab}`),
+    create: (name: string, description?: string) =>
+      request('/groups', { method: 'POST', body: JSON.stringify({ name, description }) }),
+    join: (inviteCode: string) =>
+      request('/groups/join', { method: 'POST', body: JSON.stringify({ inviteCode }) }),
+    delete: (id: number) =>
+      request(`/groups/${id}`, { method: 'DELETE' }),
+  },
+  reports: {
+    list: () => request('/reports'),
+    detail: (gameId: number) => request(`/reports/${gameId}`),
+  },
+  learning: {
+    assignments: (tab: 'todo' | 'completed' | 'expired' = 'todo') =>
+      request(`/learning/assignments?tab=${tab}`),
+    complete: (id: number, score?: number) =>
+      request(`/learning/assignments/${id}/complete`, {
+        method: 'POST',
+        body: JSON.stringify({ score: score || 0 }),
+      }),
+    createAssignment: (groupId: number, quizId: number, title?: string, dueDate?: string) =>
+      request(`/learning/groups/${groupId}/assignments`, {
+        method: 'POST',
+        body: JSON.stringify({ quizId, title, dueDate }),
+      }),
   },
 };
