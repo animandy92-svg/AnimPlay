@@ -76,6 +76,7 @@ export interface GameRoom {
 }
 export interface Player {
     id: string;
+    sessionId: string;
     nickname: string;
     socketId: string;
     score: number;
@@ -124,6 +125,11 @@ export interface SocketEvents {
         gamePin: string;
         hostId: number;
     }) => void;
+    'reconnect-player': (data: {
+        sessionId: string;
+        nickname: string;
+        gamePin?: string;
+    }) => void;
     'player-joined': (data: {
         playerId: string;
         nickname: string;
@@ -134,6 +140,16 @@ export interface SocketEvents {
         nickname: string;
         playerCount: number;
     }) => void;
+    'player-reconnected': (data: {
+        playerId: string;
+        playerCount: number;
+    }) => void;
+    'update-player-list': (data: {
+        playerId: string;
+        nickname: string;
+        playerCount: number;
+    }[]) => void;
+    'host-disconnected': () => void;
     'game-started': (data: {
         totalQuestions: number;
     }) => void;
@@ -163,6 +179,8 @@ export interface SocketEvents {
     }) => void;
     'answer-confirmed': (data: {
         accepted: boolean;
+        playerId?: string;
+        sessionId?: string;
     }) => void;
     'timer-tick': (data: {
         timeLeft: number;

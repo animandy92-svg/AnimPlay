@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 
@@ -94,10 +94,19 @@ export default function PlayerGame() {
       navigate('/game/results');
     });
 
+    const unsubHostDisconnected = on('host-disconnected', () => {
+      localStorage.removeItem('animplay_player_sessionId');
+      localStorage.removeItem('animplay_player_gamePin');
+      localStorage.removeItem('animplay_nickname');
+      alert('The host disconnected. Returning to join screen.');
+      navigate('/join');
+    });
+
     return () => {
       unsubQuestion();
       unsubResults();
       unsubGameEnd();
+      unsubHostDisconnected();
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [on, navigate, selectedAnswer]);

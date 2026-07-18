@@ -7,9 +7,11 @@ export default function Lobby() {
   const [started, setStarted] = useState(false);
   const [totalQuestions, setTotalQuestions] = useState(0);
   const navigate = useNavigate();
-  const { on } = useSocket();
+  const { emit, on } = useSocket();
 
   const nickname = localStorage.getItem('animplay_nickname') || 'Player';
+  const sessionId = localStorage.getItem('animplay_player_sessionId');
+  const playerGamePin = localStorage.getItem('animplay_player_gamePin');
 
   const handleGameStarted = useCallback(
     (data: { totalQuestions: number }) => {
@@ -28,18 +30,51 @@ export default function Lobby() {
       });
     });
 
+    const unsubPlayerList = on('player-list', (data: { players: string[] }) => {
+      setPlayers(data.players);
+    });
+
+    const unsubReconnected = on('player-reconnected', () => {
+      // The lobby will be kept in sync by the player-list event.
+    });
+
+    const unsubHostDisconnected = on('host-disconnected', () => {
+      localStorage.removeItem('animplay_player_sessionId');
+      localStorage.removeItem('animplay_player_gamePin');
+      localStorage.removeItem('animplay_nickname');
+      alert('The host disconnected. Please join again.');
+      navigate('/join');
+    });
+
     const unsubPlayerLeft = on('player-left', (data: { playerId: string; nickname: string; playerCount: number }) => {
       setPlayers(prev => prev.filter(n => n !== data.nickname));
     });
 
     const unsubStarted = on('game-started', handleGameStarted);
 
+    if (!sessionId || !playerGamePin) {
+      navigate('/join');
+      return () => {
+        unsubPlayer();
+        unsubPlayerLeft();
+        unsubStarted();
+        unsubPlayerList();
+        unsubReconnected();
+        unsubHostDisconnected();
+      };
+    }
+
+    emit('reconnect-player', { sessionId, nickname, gamePin: playerGamePin });
+
     return () => {
       unsubPlayer();
       unsubPlayerLeft();
       unsubStarted();
+      unsubPlayerList();
+      unsubReconnected();
+      unsubHostDisconnected();
     };
-  }, [on, navigate]);
+  }, [emit, nickname, on, navigate, playerGamePin, sessionId]);
 
   if (started) {
     return (

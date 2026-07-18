@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
 
 interface AnswerOption {
@@ -17,6 +17,37 @@ interface QuestionForm {
 
 const COLORS = ['red', 'blue', 'yellow', 'green'];
 const SHAPES = ['▲', '◆', '●', '■'];
+
+const SAMPLE_QUIZ: { title: string; description: string; questions: QuestionForm[] } = {
+  title: 'General Knowledge Trivia',
+  description: 'A quick test of random facts.',
+  questions: [
+    {
+      question_text: 'What is the capital of Japan?',
+      timer_seconds: 20,
+      points: 1000,
+      correct_index: 2,
+      answers: [
+        { text: 'Kyoto', color: 'red' },
+        { text: 'Osaka', color: 'blue' },
+        { text: 'Tokyo', color: 'yellow' },
+        { text: 'Seoul', color: 'green' },
+      ],
+    },
+    {
+      question_text: 'The Great Wall of China is visible from space with the naked eye.',
+      timer_seconds: 10,
+      points: 2000,
+      correct_index: 1,
+      answers: [
+        { text: 'True', color: 'red' },
+        { text: 'False', color: 'blue' },
+        { text: '', color: 'yellow' },
+        { text: '', color: 'green' },
+      ],
+    },
+  ],
+};
 
 export default function CreateQuiz() {
   const { id } = useParams();
@@ -40,12 +71,7 @@ export default function CreateQuiz() {
   });
   const [saving, setSaving] = useState(false);
   const [showAddForm, setShowAddForm] = useState(true);
-
-  useEffect(() => {
-    if (isEditing) {
-      loadQuiz();
-    }
-  }, [id]);
+  const [searchParams] = useSearchParams();
 
   const loadQuiz = async () => {
     try {
@@ -64,6 +90,24 @@ export default function CreateQuiz() {
       navigate('/dashboard');
     }
   };
+
+  const loadSampleQuiz = () => {
+    setTitle(SAMPLE_QUIZ.title);
+    setDescription(SAMPLE_QUIZ.description);
+    setQuestions(SAMPLE_QUIZ.questions);
+    setShowAddForm(false);
+  };
+
+  useEffect(() => {
+    if (isEditing) {
+      loadQuiz();
+      return;
+    }
+
+    if (searchParams.get('sample') === 'true') {
+      loadSampleQuiz();
+    }
+  }, [id, isEditing, loadQuiz, searchParams]);
 
   const handleAddQuestion = () => {
     if (!currentQ.question_text.trim()) {
@@ -162,20 +206,31 @@ export default function CreateQuiz() {
 
       <main className="max-w-4xl mx-auto p-6">
         <div className="bg-white rounded-2xl p-6 shadow mb-6">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Quiz Title"
-            className="w-full text-2xl font-bold border-b-2 border-gray-200 py-2 mb-3 focus:border-animplay-purple focus:outline-none"
-          />
-          <input
-            type="text"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Description (optional)"
-            className="w-full text-gray-500 border-b border-gray-200 py-2 focus:border-animplay-purple focus:outline-none"
-          />
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div className="space-y-1">
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Quiz Title"
+                className="w-full text-2xl font-bold border-b-2 border-gray-200 py-2 mb-3 focus:border-animplay-purple focus:outline-none"
+              />
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Description (optional)"
+                className="w-full text-gray-500 border-b border-gray-200 py-2 focus:border-animplay-purple focus:outline-none"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={loadSampleQuiz}
+              className="rounded-xl bg-animplay-purple text-white px-5 py-3 font-semibold shadow hover:bg-animplay-purple-dark transition-colors"
+            >
+              Load Sample Quiz
+            </button>
+          </div>
         </div>
 
         {questions.length > 0 && (

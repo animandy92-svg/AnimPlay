@@ -40,9 +40,14 @@ export default function HostLobby() {
       navigate('/host/game');
     });
 
+    const unsubPlayerList = on('update-player-list', (updatedPlayers: { playerId: string; nickname: string; playerCount: number }[]) => {
+      setPlayers(updatedPlayers.map((player) => player.nickname));
+    });
+
     return () => {
       unsubPlayer();
       unsubPlayerLeft();
+      unsubPlayerList();
       unsubStarted();
     };
   }, [on, navigate]);

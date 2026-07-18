@@ -149,15 +149,24 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-wrap gap-3 justify-between items-center mb-6">
         <h1 className="font-display text-4xl text-animplay-brand">My Quizzes</h1>
-        <Link
-          to="/quiz/new"
-          className="bg-animplay-brand text-white font-display text-lg py-3 px-6 rounded-xl
-                     hover:bg-animplay-brand-dark transition-colors"
-        >
-          + Create Quiz
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            to="/quiz/new"
+            className="bg-animplay-brand text-white font-display text-lg py-3 px-6 rounded-xl
+                       hover:bg-animplay-brand-dark transition-colors"
+          >
+            + Create Quiz
+          </Link>
+          <Link
+            to="/quiz/new?sample=true"
+            className="bg-white border border-animplay-brand text-animplay-brand font-display text-lg py-3 px-6 rounded-xl
+                       hover:bg-animplay-brand/10 transition-colors"
+          >
+            Load Sample Quiz
+          </Link>
+        </div>
       </div>
 
       <div className="flex gap-2 mb-4 overflow-x-auto pb-2">

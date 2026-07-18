@@ -25,21 +25,41 @@ export default function JoinGame() {
 
     setJoining(true);
 
+    const storedSessionId = localStorage.getItem('animplay_player_sessionId');
+    const storedGamePin = localStorage.getItem('animplay_player_gamePin');
+    const isReconnectAttempt = Boolean(storedSessionId && storedGamePin === gamePin);
+
     const unsubError = on('error', (data: { message: string }) => {
+      if (isReconnectAttempt) {
+        localStorage.removeItem('animplay_player_sessionId');
+        localStorage.removeItem('animplay_player_gamePin');
+        emit('join-game', { gamePin, nickname: nickname.trim() });
+        return;
+      }
+
       setError(data.message);
       setJoining(false);
       unsubError();
     });
 
-    const unsubConfirm = on('answer-confirmed', (data: { accepted: boolean; playerId?: string }) => {
+    const unsubConfirm = on('answer-confirmed', (data: { accepted: boolean; playerId?: string; sessionId?: string }) => {
       if (data.accepted) {
         localStorage.setItem('animplay_nickname', nickname);
+        localStorage.setItem('animplay_player_gamePin', gamePin);
+        if (data.sessionId) {
+          localStorage.setItem('animplay_player_sessionId', data.sessionId);
+        }
         navigate('/game/lobby');
       }
+      unsubError();
       unsubConfirm();
     });
 
-    emit('join-game', { gamePin, nickname: nickname.trim() });
+    if (isReconnectAttempt && storedSessionId) {
+      emit('reconnect-player', { sessionId: storedSessionId, nickname: nickname.trim(), gamePin });
+    } else {
+      emit('join-game', { gamePin, nickname: nickname.trim() });
+    }
   };
 
   return (

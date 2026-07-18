@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getGameByPin = getGameByPin;
 exports.setupGameSocket = setupGameSocket;
+const crypto_1 = require("crypto");
 const db_1 = require("../db");
 const scoring_1 = require("../utils/scoring");
 const gameRooms = new Map();
@@ -61,9 +62,11 @@ function setupGameSocket(io) {
                 };
                 gameRooms.set(gamePin, room);
             }
+            const sessionId = (0, crypto_1.randomUUID)();
             const playerId = `player_${socket.id}_${Date.now()}`;
             const player = {
                 id: playerId,
+                sessionId,
                 nickname,
                 socketId: socket.id,
                 score: 0,
@@ -75,7 +78,7 @@ function setupGameSocket(io) {
             room.players.set(playerId, player);
             socketToGame.set(socket.id, gamePin);
             socket.join(gamePin);
-            socket.emit('answer-confirmed', { accepted: true, playerId });
+            socket.emit('answer-confirmed', { accepted: true, playerId, sessionId });
             io.to(gamePin).emit('player-joined', {
                 playerId,
                 nickname,
@@ -91,6 +94,61 @@ function setupGameSocket(io) {
                 socket.join(data.gamePin);
                 console.log(`Host registered for game ${data.gamePin}`);
             }
+        });
+        socket.on('reconnect-player', (data) => {
+            const { sessionId, nickname, gamePin: requestedGamePin } = data;
+            const currentGamePin = socketToGame.get(socket.id);
+            let room;
+            if (requestedGamePin) {
+                room = gameRooms.get(requestedGamePin);
+            }
+            else if (currentGamePin) {
+                room = gameRooms.get(currentGamePin);
+            }
+            else {
+                room = Array.from(gameRooms.values()).find(r => Array.from(r.players.values()).some(p => p.sessionId === sessionId));
+            }
+            if (!room) {
+                socket.emit('error', { message: 'Unable to reconnect. Please join again.' });
+                return;
+            }
+            const existingPlayer = Array.from(room.players.values()).find(p => p.sessionId === sessionId);
+            if (!existingPlayer) {
+                socket.emit('error', { message: 'Unable to reconnect. Please join again.' });
+                return;
+            }
+            if (existingPlayer.disconnectTimeout) {
+                clearTimeout(existingPlayer.disconnectTimeout);
+                delete existingPlayer.disconnectTimeout;
+            }
+            existingPlayer.socketId = socket.id;
+            existingPlayer.nickname = nickname;
+            socketToGame.set(socket.id, room.gamePin);
+            socket.join(room.gamePin);
+            socket.emit('answer-confirmed', { accepted: true, playerId: existingPlayer.id, sessionId });
+            socket.emit('player-reconnected', { playerId: existingPlayer.id, playerCount: room.players.size });
+            if (room.status === 'active') {
+                const question = room.quiz.questions[room.currentQuestionIndex];
+                if (question && room.questionStartTime) {
+                    const timerMs = question.timer_seconds * 1000;
+                    const elapsed = Date.now() - room.questionStartTime;
+                    const timeLeft = Math.max(0, Math.ceil((timerMs - elapsed) / 1000));
+                    if (timeLeft > 0) {
+                        socket.emit('player-question-start', {
+                            questionId: question.id,
+                            answerCount: question.answers.length,
+                            timer: question.timer_seconds,
+                            startsAt: room.questionStartTime,
+                            questionIndex: room.currentQuestionIndex,
+                            totalQuestions: room.quiz.questions.length,
+                        });
+                    }
+                }
+            }
+            if (room.status === 'finished') {
+                socket.emit('game-ended', { finalRankings: getLeaderboard(room) });
+            }
+            console.log(`Player ${nickname} reconnected to game ${room.gamePin}`);
         });
         socket.on('host-start-game', (data) => {
             const gamePin = socketToGame.get(socket.id);
@@ -192,17 +250,35 @@ function setupGameSocket(io) {
                 return;
             if (room.hostSocketId === socket.id) {
                 console.log(`Host disconnected from game ${gamePin}`);
+                io.to(gamePin).emit('host-disconnected');
+                clearQuestionTimers(room);
+                gameRooms.delete(gamePin);
             }
             else {
                 const player = Array.from(room.players.values()).find(p => p.socketId === socket.id);
                 if (player) {
-                    room.players.delete(player.id);
-                    io.to(gamePin).emit('player-left', {
-                        playerId: player.id,
-                        nickname: player.nickname,
-                        playerCount: room.players.size,
-                    });
-                    console.log(`Player "${player.nickname}" left game ${gamePin}. Total: ${room.players.size}`);
+                    if (player.disconnectTimeout) {
+                        clearTimeout(player.disconnectTimeout);
+                    }
+                    player.socketId = '';
+                    player.disconnectTimeout = setTimeout(() => {
+                        const cleanupRoom = gameRooms.get(gamePin);
+                        if (!cleanupRoom)
+                            return;
+                        cleanupRoom.players.delete(player.id);
+                        io.to(gamePin).emit('player-left', {
+                            playerId: player.id,
+                            nickname: player.nickname,
+                            playerCount: cleanupRoom.players.size,
+                        });
+                        if (cleanupRoom.hostSocketId) {
+                            io.to(cleanupRoom.hostSocketId).emit('update-player-list', Array.from(cleanupRoom.players.values()));
+                        }
+                        console.log(`Player "${player.nickname}" timed out and was removed from game ${gamePin}. Total: ${cleanupRoom.players.size}`);
+                        if (cleanupRoom.status === 'active') {
+                            checkIfAllAnswered(cleanupRoom, io);
+                        }
+                    }, 15000);
                 }
             }
             socketToGame.delete(socket.id);
@@ -229,14 +305,16 @@ function sendQuestion(room, io) {
         totalQuestions: room.quiz.questions.length,
     });
     for (const player of room.players.values()) {
-        io.to(player.socketId).emit('player-question-start', {
-            questionId: question.id,
-            answerCount: question.answers.length,
-            timer: question.timer_seconds,
-            startsAt,
-            questionIndex: room.currentQuestionIndex,
-            totalQuestions: room.quiz.questions.length,
-        });
+        if (player.socketId) {
+            io.to(player.socketId).emit('player-question-start', {
+                questionId: question.id,
+                answerCount: question.answers.length,
+                timer: question.timer_seconds,
+                startsAt,
+                questionIndex: room.currentQuestionIndex,
+                totalQuestions: room.quiz.questions.length,
+            });
+        }
     }
     const timerMs = question.timer_seconds * 1000;
     room.questionTimerInterval = setInterval(() => {
