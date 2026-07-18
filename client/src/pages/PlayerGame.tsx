@@ -4,12 +4,17 @@ import { useSocket } from '../hooks/useSocket';
 
 interface QuestionData {
   questionId: number;
-  questionText: string;
-  answers: { text: string; color: string }[];
+  answerCount: number;
   timer: number;
   startsAt: number;
   questionIndex: number;
   totalQuestions: number;
+}
+
+interface AnswerShape {
+  shape: string;
+  color: string;
+  colorClass: string;
 }
 
 interface LeaderboardEntry {
@@ -34,8 +39,15 @@ export default function PlayerGame() {
   const navigate = useNavigate();
   const { emit, on } = useSocket();
 
+  const ANSWER_SHAPES: AnswerShape[] = [
+    { shape: '▲', color: 'red', colorClass: 'bg-animplay-red' },
+    { shape: '◆', color: 'blue', colorClass: 'bg-animplay-blue' },
+    { shape: '●', color: 'yellow', colorClass: 'bg-animplay-yellow' },
+    { shape: '■', color: 'green', colorClass: 'bg-animplay-green' },
+  ];
+
   useEffect(() => {
-    const unsubQuestion = on('question-started', (data: QuestionData) => {
+    const unsubQuestion = on('player-question-start', (data: QuestionData) => {
       setQuestion(data);
       setSelectedAnswer(null);
       setCorrectIndex(0);
@@ -104,13 +116,6 @@ export default function PlayerGame() {
     });
   };
 
-  const colorMap: Record<string, string> = {
-    red: 'bg-animplay-red',
-    blue: 'bg-animplay-blue',
-    yellow: 'bg-animplay-yellow',
-    green: 'bg-animplay-green',
-  };
-
   if (phase === 'countdown') {
     return (
       <div className="min-h-screen bg-animplay-purple flex items-center justify-center">
@@ -130,6 +135,8 @@ export default function PlayerGame() {
     const timerPercent = (timeLeft / question.timer) * 100;
     const timerColor = timeLeft > question.timer * 0.5 ? 'text-green-400' :
                        timeLeft > question.timer * 0.25 ? 'text-yellow-400' : 'text-red-400';
+
+    const visibleShapes = ANSWER_SHAPES.slice(0, question.answerCount);
 
     return (
       <div className="min-h-screen bg-animplay-purple p-4 flex flex-col">
@@ -152,13 +159,13 @@ export default function PlayerGame() {
         <div className="flex-1 flex items-center justify-center mb-6">
           <div className="bg-white rounded-3xl p-6 shadow-2xl w-full max-w-2xl text-center">
             <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
-              {question.questionText}
+              Look at the main screen!
             </h2>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto w-full">
-          {question.answers.map((answer, i) => {
+          {visibleShapes.map((answerShape, i) => {
             const isSelected = selectedAnswer === i;
             const showCorrect = selectedAnswer !== null && i === correctIndex;
             const showWrong = selectedAnswer === i && selectedAnswer !== correctIndex;
@@ -169,7 +176,7 @@ export default function PlayerGame() {
                 onClick={() => handleAnswer(i)}
                 disabled={selectedAnswer !== null}
                 className={`
-                  ${colorMap[answer.color]} text-white font-display text-lg md:text-xl py-6 px-4 rounded-2xl
+                  ${answerShape.colorClass} text-white font-display text-4xl py-10 px-4 rounded-2xl
                   transition-all duration-200 shadow-lg
                   ${isSelected ? 'ring-4 ring-white scale-95' : 'hover:scale-105'}
                   ${showCorrect ? 'ring-4 ring-green-400 animate-pulse' : ''}
@@ -177,10 +184,7 @@ export default function PlayerGame() {
                   ${selectedAnswer !== null && !isSelected && !showCorrect ? 'opacity-50' : ''}
                 `}
               >
-                <div className="text-3xl mb-2">
-                  {i === 0 ? '▲' : i === 1 ? '◆' : i === 2 ? '●' : '■'}
-                </div>
-                {answer.text}
+                {answerShape.shape}
               </button>
             );
           })}
@@ -210,7 +214,7 @@ export default function PlayerGame() {
             <div className="mt-6 space-y-2">
               {stats.map(s => (
                 <div key={s.answerIndex} className="flex items-center gap-2">
-                  <div className={`w-4 h-4 rounded ${colorMap[question?.answers[s.answerIndex]?.color || '']}`} />
+                  <div className={`w-4 h-4 rounded ${ANSWER_SHAPES[s.answerIndex]?.colorClass || ''}`} />
                   <div className="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
                     <div
                       className="h-full bg-gray-300 rounded-full flex items-center px-3 text-sm font-bold"

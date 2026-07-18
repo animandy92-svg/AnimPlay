@@ -28,13 +28,14 @@ export default function HostGame() {
   const [stats, setStats] = useState<{ answerIndex: number; count: number }[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [totalAnswered, setTotalAnswered] = useState(0);
+  const [playerCount, setPlayerCount] = useState(0);
   const navigate = useNavigate();
   const { emit, on } = useSocket();
 
   const gameId = localStorage.getItem('animplay_gameId') || '';
 
   useEffect(() => {
-    const unsubQuestion = on('question-started', (data: QuestionData) => {
+    const unsubQuestion = on('host-question-start', (data: QuestionData) => {
       setQuestion(data);
       setPhase('question');
       setTotalAnswered(0);
@@ -58,8 +59,17 @@ export default function HostGame() {
       return () => clearInterval(interval);
     });
 
+    const unsubAnswerReceived = on('answer-received', (data: { answeredCount: number; totalCount: number }) => {
+      setTotalAnswered(data.answeredCount);
+      setPlayerCount(data.totalCount);
+    });
+
     const unsubPlayerJoined = on('player-joined', (data: { playerId: string; nickname: string; playerCount: number }) => {
-      setTotalAnswered(prev => prev);
+      setPlayerCount(data.playerCount);
+    });
+
+    const unsubPlayerLeft = on('player-left', (data: { playerId: string; nickname: string; playerCount: number }) => {
+      setPlayerCount(data.playerCount);
     });
 
     const unsubResults = on('question-ended', (data: { correctIndex: number; stats: { answerIndex: number; count: number }[]; leaderboard: LeaderboardEntry[] }) => {
@@ -79,7 +89,9 @@ export default function HostGame() {
 
     return () => {
       unsubQuestion();
+      unsubAnswerReceived();
       unsubPlayerJoined();
+      unsubPlayerLeft();
       unsubResults();
       unsubGameEnd();
     };
@@ -146,6 +158,9 @@ export default function HostGame() {
         </div>
 
         <div className="text-center pb-8">
+          <div className="text-white/80 font-bold text-lg mb-3">
+            {totalAnswered} / {playerCount} answered
+          </div>
           <button
             onClick={handleEndGame}
             className="bg-white/20 text-white font-bold py-2 px-6 rounded-xl hover:bg-white/30 transition-colors text-sm"

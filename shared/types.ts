@@ -79,6 +79,8 @@ export interface GameRoom {
   quiz: QuizDetail;
   startedAt: Date;
   questionStartTime?: number;
+  questionTimeout?: ReturnType<typeof setTimeout>;
+  questionTimerInterval?: ReturnType<typeof setInterval>;
 }
 
 export interface Player {
@@ -88,6 +90,7 @@ export interface Player {
   score: number;
   streak: number;
   correctCount: number;
+  hasAnswered: boolean;
   answers: PlayerAnswer[];
 }
 
@@ -123,8 +126,12 @@ export interface SocketEvents {
   'player-joined': (data: { playerId: string; nickname: string; playerCount: number }) => void;
   'player-left': (data: { playerId: string; nickname: string; playerCount: number }) => void;
   'game-started': (data: { totalQuestions: number }) => void;
-  'question-started': (data: { questionId: number; questionText: string; answers: { text: string; color: string }[]; timer: number; startsAt: number; questionIndex: number; totalQuestions: number }) => void;
+  'host-question-start': (data: { questionId: number; questionText: string; answers: { text: string; color: string }[]; timer: number; startsAt: number; questionIndex: number; totalQuestions: number }) => void;
+  'player-question-start': (data: { questionId: number; answerCount: number; timer: number; startsAt: number; questionIndex: number; totalQuestions: number }) => void;
+  'answer-received': (data: { answeredCount: number; totalCount: number }) => void;
   'answer-confirmed': (data: { accepted: boolean }) => void;
+  'timer-tick': (data: { timeLeft: number }) => void;
+  'time-up': () => void;
   'question-ended': (data: { correctIndex: number; stats: { answerIndex: number; count: number }[]; leaderboard: LeaderboardEntry[] }) => void;
   'game-ended': (data: { finalRankings: LeaderboardEntry[] }) => void;
   'error': (data: { message: string }) => void;
