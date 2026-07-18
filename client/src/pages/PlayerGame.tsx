@@ -102,19 +102,22 @@ export default function PlayerGame() {
     };
   }, [on, navigate, selectedAnswer]);
 
-  const handleAnswer = (answerIndex: number) => {
-    if (selectedAnswer !== null || !question) return;
+  const handleAnswer = useCallback(
+    (answerIndex: number) => {
+      if (selectedAnswer !== null || !question) return;
 
-    setSelectedAnswer(answerIndex);
-    const responseTimeMs = question.timer * 1000 - timeLeft * 1000;
+      setSelectedAnswer(answerIndex);
+      const responseTimeMs = question.timer * 1000 - timeLeft * 1000;
 
-    emit('answer-submitted', {
-      gameId: Number(localStorage.getItem('animplay_gameId') || 0),
-      questionId: question.questionId,
-      answerIndex,
-      responseTimeMs,
-    });
-  };
+      emit('answer-submitted', {
+        gameId: Number(localStorage.getItem('animplay_gameId') || 0),
+        questionId: question.questionId,
+        answerIndex,
+        responseTimeMs,
+      });
+    },
+    [emit, question, selectedAnswer, timeLeft]
+  );
 
   if (phase === 'countdown') {
     return (

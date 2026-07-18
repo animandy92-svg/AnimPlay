@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 
@@ -10,6 +10,15 @@ export default function Lobby() {
   const { on } = useSocket();
 
   const nickname = localStorage.getItem('animplay_nickname') || 'Player';
+
+  const handleGameStarted = useCallback(
+    (data: { totalQuestions: number }) => {
+      setTotalQuestions(data.totalQuestions);
+      setStarted(true);
+      setTimeout(() => navigate('/game/play'), 2000);
+    },
+    [navigate]
+  );
 
   useEffect(() => {
     const unsubPlayer = on('player-joined', (data: { playerId: string; nickname: string; playerCount: number }) => {
@@ -23,11 +32,7 @@ export default function Lobby() {
       setPlayers(prev => prev.filter(n => n !== data.nickname));
     });
 
-    const unsubStarted = on('game-started', (data: { totalQuestions: number }) => {
-      setTotalQuestions(data.totalQuestions);
-      setStarted(true);
-      setTimeout(() => navigate('/game/play'), 2000);
-    });
+    const unsubStarted = on('game-started', handleGameStarted);
 
     return () => {
       unsubPlayer();

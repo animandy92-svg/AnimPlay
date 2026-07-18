@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 
@@ -47,13 +47,13 @@ export default function HostLobby() {
     };
   }, [on, navigate]);
 
-  const handleStart = () => {
+  const handleStart = useCallback(() => {
     if (players.length === 0) {
       alert('Wait for at least 1 player to join!');
       return;
     }
     emit('host-start-game', { gameId: Number(gameId) });
-  };
+  }, [emit, gameId, players.length]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-animplay-purple to-animplay-purple-dark flex flex-col items-center justify-center p-4">

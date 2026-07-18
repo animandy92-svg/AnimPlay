@@ -97,15 +97,15 @@ export default function HostGame() {
     };
   }, [on]);
 
-  const handleNextQuestion = () => {
+  const handleNextQuestion = useCallback(() => {
     emit('host-next-question', { gameId: Number(gameId) });
-  };
+  }, [emit, gameId]);
 
-  const handleEndGame = () => {
+  const handleEndGame = useCallback(() => {
     if (confirm('End the game now?')) {
       emit('host-end-game', { gameId: Number(gameId) });
     }
-  };
+  }, [emit, gameId]);
 
   const colorMap: Record<string, string> = {
     red: 'bg-animplay-red',
