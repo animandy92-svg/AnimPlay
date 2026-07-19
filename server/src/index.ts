@@ -22,7 +22,7 @@ const httpServer = createServer(app);
 
 const io = new SocketServer(httpServer, {
   cors: {
-    origin: ['http://localhost:5173', 'http://localhost:3000'],
+    origin: ['http://localhost:5173', 'http://localhost:3000', 'https://animplay-872d3.web.app', 'https://animplay-k69u.onrender.com'],
     methods: ['GET', 'POST'],
   },
 });
