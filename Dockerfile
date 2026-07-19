@@ -29,4 +29,4 @@ RUN npm ci --only=production
 COPY --from=builder /app/client/dist ./public
 
 EXPOSE 3001
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/server/src/index.js"]

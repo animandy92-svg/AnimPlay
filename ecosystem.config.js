@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'animplay-server',
       cwd: './server',
-      script: 'dist/index.js',
+      script: 'dist/server/src/index.js',
       env: {
         NODE_ENV: 'production',
         PORT: 3001,
