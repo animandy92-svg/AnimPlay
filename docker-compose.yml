@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: animplay
+      MONGO_INITDB_ROOT_PASSWORD: animplay_pass
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  animplay:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      MONGO_URI: mongodb://animplay:animplay_pass@mongodb:27017/animplay_db?authSource=admin
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-to-a-long-random-string}
+      PORT: 3001
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    volumes:
+      - ./server/.env:/app/.env:ro
+
+volumes:
+  mongodb_data:

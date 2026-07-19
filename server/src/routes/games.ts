@@ -7,7 +7,7 @@ const router = Router();
 
 router.post('/start', authenticateToken, async (req: Request, res: Response) => {
   const hostId = (req as any).hostId;
-  const { quizId } = req.body;
+  const { quizId, gameMode } = req.body;
 
   if (!quizId) {
     return res.status(400).json({ error: 'quizId is required' });
@@ -44,7 +44,7 @@ router.post('/start', authenticateToken, async (req: Request, res: Response) => 
     endedAt: null,
   });
 
-  res.json({ gameId: id, gamePin });
+  res.json({ gameId: id, gamePin, gameMode: gameMode || 'classic' });
 });
 
 router.get('/:pin', async (req: Request, res: Response) => {

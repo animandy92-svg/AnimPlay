@@ -5,6 +5,7 @@ import {
   Quiz,
   Question,
   Answer,
+  PowerUp,
   nextId,
 } from './models';
 
@@ -17,6 +18,7 @@ export async function connectDb(): Promise<void> {
   await mongoose.connect(uri);
   console.log('Successfully connected to MongoDB!');
   await seedDiscoverContent();
+  await seedPowerUps();
 }
 
 export async function disconnectDb(): Promise<void> {
@@ -26,7 +28,7 @@ export async function disconnectDb(): Promise<void> {
 const COLORS = ['red', 'blue', 'yellow', 'green'];
 
 async function seedDiscoverContent(): Promise<void> {
-  const publicCount = await Quiz.countDocuments({ is_public: true });
+  const publicCount = await Quiz.countDocuments({ isPublic: true });
   if (publicCount > 0) return;
 
   let systemHost = await Host.findOne({ username: 'animplay' });
@@ -93,16 +95,16 @@ async function seedDiscoverContent(): Promise<void> {
     const quizId = await nextId('quizzes');
     await Quiz.create({
       id: quizId,
-      host_id: hostId,
+      hostId,
       title: sample.title,
       description: sample.description,
-      is_public: true,
+      isPublic: true,
       category: sample.category,
-      play_count: Math.floor(Math.random() * 5000) + 100,
+      playCount: Math.floor(Math.random() * 5000) + 100,
       status: 'published',
-      is_favorite: false,
-      folder_id: null,
-      deleted_at: null,
+      isFavorite: false,
+      folderId: null,
+      deletedAt: null,
     });
 
     for (let qi = 0; qi < sample.questions.length; qi++) {
@@ -110,22 +112,22 @@ async function seedDiscoverContent(): Promise<void> {
       const questionId = await nextId('questions');
       await Question.create({
         id: questionId,
-        quiz_id: quizId,
-        question_text: q.text,
-        image_url: null,
-        timer_seconds: 20,
+        quizId,
+        questionText: q.text,
+        imageUrl: null,
+        timerSeconds: 20,
         points: 1000,
-        points_multiplier: 1.0,
-        sort_order: qi,
-        correct_index: q.correct,
+        pointsMultiplier: 1.0,
+        sortOrder: qi,
+        correctIndex: q.correct,
       });
 
       for (let ai = 0; ai < q.answers.length; ai++) {
         const answerId = await nextId('answers');
         await Answer.create({
           id: answerId,
-          question_id: questionId,
-          sort_index: ai,
+          questionId,
+          sortIndex: ai,
           text: q.answers[ai],
           color: COLORS[ai] || 'red',
         });
@@ -134,4 +136,22 @@ async function seedDiscoverContent(): Promise<void> {
   }
 
   console.log('Seeded discover content');
+}
+
+async function seedPowerUps(): Promise<void> {
+  const count = await PowerUp.countDocuments();
+  if (count > 0) return;
+
+  const powerUps = [
+    { name: 'double_points', description: 'Double points for next correct answer', icon: '2x', cost: 500 },
+    { name: 'remove_one', description: 'Remove one wrong answer', icon: '-1', cost: 300 },
+    { name: 'time_freeze', description: 'Pause timer for 3 seconds', icon: '⏸', cost: 400 },
+  ];
+
+  for (const pu of powerUps) {
+    const id = await nextId('power_ups');
+    await PowerUp.create({ id, ...pu });
+  }
+
+  console.log('Seeded power-ups');
 }

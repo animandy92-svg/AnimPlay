@@ -131,9 +131,8 @@ export default function Dashboard() {
 
   const handleToggleFavorite = async (quiz: Quiz) => {
     try {
-      await api.quizzes.update(quiz.id, {});
       const newFav = quiz.is_favorite ? 0 : 1;
-      await api.quizzes.update(quiz.id, {} as any);
+      await api.quizzes.update(quiz.id, { is_favorite: newFav });
       setQuizzes(quizzes.map(q => q.id === quiz.id ? { ...q, is_favorite: newFav } : q));
     } catch {
       console.error('Failed to toggle favorite');

@@ -1,77 +1,87 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const db_1 = require("../db");
+const models_1 = require("../models");
 const auth_1 = require("./auth");
 const router = (0, express_1.Router)();
-router.get('/assignments', auth_1.authenticateToken, (req, res) => {
-    const db = (0, db_1.getDb)();
+router.get('/assignments', auth_1.authenticateToken, async (req, res) => {
     const hostId = req.hostId;
     const tab = req.query.tab || 'todo';
-    const now = new Date().toISOString();
-    let query = `
-    SELECT a.*, q.title as quiz_title, g.name as group_name,
-           ac.completed_at IS NOT NULL as is_completed
-    FROM assignments a
-    JOIN quizzes q ON q.id = a.quiz_id
-    JOIN groups g ON g.id = a.group_id
-    JOIN group_members gm ON gm.group_id = g.id AND gm.host_id = ?
-    LEFT JOIN assignment_completions ac ON ac.assignment_id = a.id AND ac.host_id = ?
-    WHERE 1=1
-  `;
-    if (tab === 'completed') {
-        query += ' AND ac.completed_at IS NOT NULL';
+    const now = new Date();
+    const memberships = await models_1.GroupMember.find({ hostId }).lean();
+    const groupIds = memberships.map((m) => m.groupId);
+    const assignments = await models_1.Assignment.find({ groupId: { $in: groupIds } }).lean();
+    const result = [];
+    for (const a of assignments) {
+        const quiz = await models_1.Quiz.findOne({ id: a.quizId }).lean();
+        const group = await models_1.Group.findOne({ id: a.groupId }).lean();
+        const completion = await models_1.AssignmentCompletion.findOne({ assignmentId: a.id, hostId }).lean();
+        const isCompleted = !!completion;
+        if (tab === 'completed' && !isCompleted)
+            continue;
+        if (tab === 'todo' && (isCompleted || (a.dueDate && a.dueDate < now)))
+            continue;
+        if (tab === 'expired' && (isCompleted || !(a.dueDate && a.dueDate < now)))
+            continue;
+        result.push({
+            ...a,
+            quiz_title: quiz?.title,
+            group_name: group?.name,
+            is_completed: isCompleted,
+        });
     }
-    else if (tab === 'expired') {
-        query += ' AND ac.completed_at IS NULL AND a.due_date IS NOT NULL AND a.due_date < ?';
-    }
-    else {
-        query += ' AND ac.completed_at IS NULL AND (a.due_date IS NULL OR a.due_date >= ?)';
-    }
-    query += ' ORDER BY a.due_date ASC NULLS LAST, a.created_at DESC';
-    const params = tab === 'expired'
-        ? [hostId, hostId, now]
-        : tab === 'todo'
-            ? [hostId, hostId, now]
-            : [hostId, hostId];
-    const assignments = db.prepare(query).all(...params);
-    res.json({ assignments });
+    res.json({ assignments: result });
 });
-router.post('/assignments/:id/complete', auth_1.authenticateToken, (req, res) => {
-    const db = (0, db_1.getDb)();
+router.post('/assignments/:id/complete', auth_1.authenticateToken, async (req, res) => {
     const hostId = req.hostId;
-    const assignmentId = req.params.id;
+    const assignmentId = Number(req.params.id);
     const { score = 0 } = req.body;
-    const assignment = db.prepare(`
-    SELECT a.* FROM assignments a
-    JOIN group_members gm ON gm.group_id = a.group_id
-    WHERE a.id = ? AND gm.host_id = ?
-  `).get(assignmentId, hostId);
+    const assignment = await models_1.Assignment.findOne({ id: assignmentId });
     if (!assignment) {
         return res.status(404).json({ error: 'Assignment not found' });
     }
-    db.prepare(`
-    INSERT INTO assignment_completions (assignment_id, host_id, score)
-    VALUES (?, ?, ?)
-    ON CONFLICT(assignment_id, host_id) DO UPDATE SET completed_at = CURRENT_TIMESTAMP, score = ?
-  `).run(assignmentId, hostId, score, score);
+    const membership = await models_1.GroupMember.findOne({ groupId: assignment.groupId, hostId });
+    if (!membership) {
+        return res.status(404).json({ error: 'Assignment not found' });
+    }
+    const existing = await models_1.AssignmentCompletion.findOne({ assignmentId, hostId });
+    if (existing) {
+        await models_1.AssignmentCompletion.updateOne({ assignmentId, hostId }, { $set: { completedAt: new Date(), score } });
+    }
+    else {
+        const id = await (0, models_1.nextId)('assignment_completions');
+        await models_1.AssignmentCompletion.create({
+            id,
+            assignmentId,
+            hostId,
+            completedAt: new Date(),
+            score,
+        });
+    }
     res.json({ success: true });
 });
-router.post('/groups/:groupId/assignments', auth_1.authenticateToken, (req, res) => {
-    const db = (0, db_1.getDb)();
+router.post('/groups/:groupId/assignments', auth_1.authenticateToken, async (req, res) => {
     const hostId = req.hostId;
-    const groupId = req.params.groupId;
+    const groupId = Number(req.params.groupId);
     const { quizId, title, dueDate } = req.body;
-    const group = db.prepare('SELECT * FROM groups WHERE id = ? AND owner_id = ?').get(groupId, hostId);
+    const group = await models_1.Group.findOne({ id: groupId, ownerId: hostId });
     if (!group) {
         return res.status(403).json({ error: 'Only group owners can assign quizzes' });
     }
-    const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND host_id = ?').get(quizId, hostId);
+    const quiz = await models_1.Quiz.findOne({ id: Number(quizId), hostId });
     if (!quiz) {
         return res.status(404).json({ error: 'Quiz not found' });
     }
-    const result = db.prepare('INSERT INTO assignments (group_id, quiz_id, title, due_date, created_by) VALUES (?, ?, ?, ?, ?)').run(groupId, quizId, title || quiz.title, dueDate || null, hostId);
-    res.json({ assignment: { id: result.lastInsertRowid } });
+    const id = await (0, models_1.nextId)('assignments');
+    const assignment = await models_1.Assignment.create({
+        id,
+        groupId,
+        quizId: Number(quizId),
+        title: title || quiz.title,
+        dueDate: dueDate ? new Date(dueDate) : null,
+        createdBy: hostId,
+    });
+    res.json({ assignment: { id } });
 });
 exports.default = router;
 //# sourceMappingURL=learning.js.map

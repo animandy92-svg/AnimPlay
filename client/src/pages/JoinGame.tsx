@@ -2,11 +2,19 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 
+interface Team {
+  id: number;
+  name: string;
+  color: string;
+}
+
 export default function JoinGame() {
   const [gamePin, setGamePin] = useState('');
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState('');
   const [joining, setJoining] = useState(false);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
   const navigate = useNavigate();
   const { emit, on } = useSocket();
 
@@ -62,10 +70,14 @@ export default function JoinGame() {
       unsubConfirm();
     });
 
+    const unsubTeamUpdated = on('team-updated', (data: { teams: Team[] }) => {
+      setTeams(data.teams);
+    });
+
     if (isReconnectAttempt && storedSessionId) {
       emit('reconnect-player', { sessionId: storedSessionId, nickname: nickname.trim(), gamePin });
     } else {
-      emit('join-game', { gamePin, nickname: nickname.trim() });
+      emit('join-game', { gamePin, nickname: nickname.trim(), teamId: selectedTeam ?? undefined });
     }
   };
 
@@ -107,6 +119,38 @@ export default function JoinGame() {
               placeholder="Your cool nickname"
             />
           </div>
+
+          {teams.length > 0 && (
+            <div className="mb-6">
+              <label className="block text-gray-600 font-bold mb-2 text-lg">
+                Select Team (optional)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTeam(null)}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                    selectedTeam === null ? 'bg-animplay-brand text-white' : 'bg-gray-200 text-gray-600'
+                  }`}
+                >
+                  No team
+                </button>
+                {teams.map(team => (
+                  <button
+                    key={team.id}
+                    type="button"
+                    onClick={() => setSelectedTeam(team.id)}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 ${
+                      selectedTeam === team.id ? 'bg-animplay-brand text-white' : 'bg-gray-200 text-gray-600'
+                    }`}
+                  >
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: team.color }} />
+                    {team.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 text-animplay-red font-bold text-center">

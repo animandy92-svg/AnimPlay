@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
+const dotenv_1 = __importDefault(require("dotenv"));
 const http_1 = require("http");
 const socket_io_1 = require("socket.io");
 const db_1 = require("./db");
@@ -17,6 +18,7 @@ const groups_1 = __importDefault(require("./routes/groups"));
 const learning_1 = __importDefault(require("./routes/learning"));
 const folders_1 = __importDefault(require("./routes/folders"));
 const gameSocket_1 = require("./socket/gameSocket");
+dotenv_1.default.config();
 const PORT = process.env.PORT || 3001;
 const app = (0, express_1.default)();
 const httpServer = (0, http_1.createServer)(app);
@@ -39,9 +41,12 @@ app.use('/api/folders', folders_1.default);
 app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
-(0, db_1.initializeDb)();
-(0, gameSocket_1.setupGameSocket)(io);
-httpServer.listen(PORT, () => {
-    console.log(`AnimPlay server running on http://localhost:${PORT}`);
+(0, db_1.connectDb)().then(() => {
+    (0, gameSocket_1.setupGameSocket)(io);
+    process.on('SIGINT', () => { (0, db_1.disconnectDb)().then(() => process.exit(0)); });
+    process.on('SIGTERM', () => { (0, db_1.disconnectDb)().then(() => process.exit(0)); });
+    httpServer.listen(PORT, () => {
+        console.log(`AnimPlay server running on http://localhost:${PORT}`);
+    });
 });
 //# sourceMappingURL=index.js.map

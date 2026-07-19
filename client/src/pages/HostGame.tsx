@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
+import type { QuestionType, ChatMessage as IChatMessage, LeaderboardEntry } from '@shared/types';
 
 interface QuestionData {
   questionId: number;
@@ -10,14 +11,13 @@ interface QuestionData {
   startsAt: number;
   questionIndex: number;
   totalQuestions: number;
+  questionType: QuestionType;
 }
 
-interface LeaderboardEntry {
-  rank: number;
+interface PendingAnswer {
+  playerId: string;
   nickname: string;
-  score: number;
-  correct: number;
-  streak: number;
+  answerIndex: number;
 }
 
 export default function HostGame() {
@@ -29,6 +29,9 @@ export default function HostGame() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [totalAnswered, setTotalAnswered] = useState(0);
   const [playerCount, setPlayerCount] = useState(0);
+  const [pendingAnswers, setPendingAnswers] = useState<PendingAnswer[]>([]);
+  const [chatMessages, setChatMessages] = useState<IChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
   const navigate = useNavigate();
   const { emit, on } = useSocket();
 
@@ -40,6 +43,7 @@ export default function HostGame() {
       setPhase('question');
       setTotalAnswered(0);
       setTimeLeft(data.timer);
+      setPendingAnswers([]);
     });
 
     const unsubTimerTick = on('timer-tick', (data: { timeLeft: number }) => {
@@ -74,6 +78,24 @@ export default function HostGame() {
       setPhase('finished');
     });
 
+    const unsubAnswerConfirmed = on('answer-confirmed', (data: { accepted: boolean; playerId?: string }) => {
+      if (data.accepted && data.playerId) {
+        setPendingAnswers(prev => prev.filter(a => a.playerId !== data.playerId));
+      }
+    });
+
+    const unsubChatReceived = on('chat-received', (data: { playerId: string; nickname: string; message: string; type: string }) => {
+      setChatMessages(prev => [...prev, {
+        id: Date.now(),
+        gameId: 0,
+        playerId: data.playerId,
+        nickname: data.nickname,
+        message: data.message,
+        type: data.type as 'chat' | 'reaction',
+        createdAt: new Date().toISOString(),
+      }]);
+    });
+
     return () => {
       unsubQuestion();
       unsubTimerTick();
@@ -82,8 +104,15 @@ export default function HostGame() {
       unsubPlayerLeft();
       unsubResults();
       unsubGameEnd();
+      unsubAnswerConfirmed();
+      unsubChatReceived();
     };
   }, [on]);
+
+  const handleJudge = (playerId: string, points: number) => {
+    emit('host-judge', { gamePin: localStorage.getItem('animplay_gamePin') || '', questionId: question?.questionId || 0, playerId, points });
+    setPendingAnswers(prev => prev.filter(a => a.playerId !== playerId));
+  };
 
   const handleNextQuestion = useCallback(() => {
     emit('host-next-question', { gameId: Number(gameId) });
@@ -94,6 +123,14 @@ export default function HostGame() {
       emit('host-end-game', { gameId: Number(gameId) });
     }
   }, [emit, gameId]);
+
+  const handleSendChat = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    const gamePin = localStorage.getItem('animplay_gamePin') || '';
+    emit('chat-message', { gamePin, message: chatInput.trim() });
+    setChatInput('');
+  };
 
   const colorMap: Record<string, string> = {
     red: 'bg-animplay-red',
@@ -128,6 +165,9 @@ export default function HostGame() {
             <h2 className="text-3xl md:text-5xl font-bold text-gray-800">
               {question.questionText}
             </h2>
+            {question.questionType === 'open_ended' && (
+              <p className="mt-4 text-animplay-brand font-bold">Open-ended - Judge answers manually</p>
+            )}
           </div>
         </div>
 
@@ -149,6 +189,20 @@ export default function HostGame() {
           <div className="text-white/80 font-bold text-lg mb-3">
             {totalAnswered} / {playerCount} answered
           </div>
+          {pendingAnswers.length > 0 && (
+            <div className="mb-4">
+              <div className="text-white/60 text-sm mb-2">Pending judgments:</div>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {pendingAnswers.map(answer => (
+                  <div key={answer.playerId} className="bg-white/10 rounded-lg p-2 flex items-center gap-2">
+                    <span className="text-white text-sm">{answer.nickname}</span>
+                    <button onClick={() => handleJudge(answer.playerId, 500)} className="bg-animplay-green text-white text-xs px-2 py-1 rounded">+500</button>
+                    <button onClick={() => handleJudge(answer.playerId, 0)} className="bg-animplay-red text-white text-xs px-2 py-1 rounded">+0</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <button
             onClick={handleEndGame}
             className="bg-white/20 text-white font-bold py-2 px-6 rounded-xl hover:bg-white/30 transition-colors text-sm"
@@ -199,7 +253,10 @@ export default function HostGame() {
                 <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-bold">
                   {entry.rank}
                 </div>
-                <div className="flex-1">{entry.nickname}</div>
+                <div className="flex-1">
+                  {entry.nickname}
+                  {entry.teamName && <span className="text-xs text-gray-400 ml-2">({entry.teamName})</span>}
+                </div>
                 <div className="font-bold">{entry.score.toLocaleString()}</div>
               </div>
             ))}
@@ -239,7 +296,10 @@ export default function HostGame() {
                 }`}>
                   {entry.rank}
                 </div>
-                <div className="flex-1 text-lg">{entry.nickname}</div>
+                <div className="flex-1 text-lg">
+                  {entry.nickname}
+                  {entry.teamName && <span className="text-xs text-gray-400 ml-2">({entry.teamName})</span>}
+                </div>
                 <div className="font-bold text-lg">{entry.score.toLocaleString()}</div>
               </div>
             ))}

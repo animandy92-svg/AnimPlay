@@ -1,199 +1,266 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const db_1 = require("../db");
+const models_1 = require("../models");
 const auth_1 = require("./auth");
 const router = (0, express_1.Router)();
-router.get('/', auth_1.authenticateToken, (req, res) => {
-    const db = (0, db_1.getDb)();
+const COLORS = ['red', 'blue', 'yellow', 'green'];
+router.get('/', auth_1.authenticateToken, async (req, res) => {
     const hostId = req.hostId;
     const tab = req.query.tab || 'recent';
-    const folderId = req.query.folderId;
-    let query = `
-    SELECT q.*, COUNT(qu.id) as question_count
-    FROM quizzes q
-    LEFT JOIN questions qu ON qu.quiz_id = q.id
-    WHERE q.host_id = ?
-  `;
-    const params = [hostId];
+    const folderId = req.query.folderId ? Number(req.query.folderId) : undefined;
+    const filter = { hostId };
     if (tab === 'trash') {
-        query += ' AND q.deleted_at IS NOT NULL';
+        filter.deletedAt = { $ne: null };
     }
     else {
-        query += ' AND q.deleted_at IS NULL';
+        filter.deletedAt = null;
         if (tab === 'drafts')
-            query += " AND q.status = 'draft'";
+            filter.status = 'draft';
         else if (tab === 'favorites')
-            query += ' AND q.is_favorite = 1';
+            filter.isFavorite = true;
         else if (tab === 'shared') {
             return res.json({ quizzes: [] });
         }
     }
-    if (folderId) {
-        query += ' AND q.id IN (SELECT quiz_id FROM quiz_folders WHERE folder_id = ?)';
-        params.push(folderId);
+    if (folderId)
+        filter.folderId = folderId;
+    let sort = { updatedAt: -1 };
+    const quizzes = await models_1.Quiz.find(filter).sort(sort).lean();
+    const result = [];
+    for (const q of quizzes) {
+        const questionCount = await models_1.Question.countDocuments({ quizId: q.id });
+        result.push({ ...q, question_count: questionCount });
     }
-    query += ' GROUP BY q.id ORDER BY q.updated_at DESC';
-    const quizzes = db.prepare(query).all(...params);
-    res.json({ quizzes });
+    res.json({ quizzes: result });
 });
-router.post('/', auth_1.authenticateToken, (req, res) => {
-    const db = (0, db_1.getDb)();
+router.post('/', auth_1.authenticateToken, async (req, res) => {
     const hostId = req.hostId;
     const { title, description, status, is_public } = req.body;
     if (!title) {
         return res.status(400).json({ error: 'Title is required' });
     }
-    const result = db.prepare('INSERT INTO quizzes (host_id, title, description, status, is_public) VALUES (?, ?, ?, ?, ?)').run(hostId, title, description || '', status || 'draft', is_public ? 1 : 0);
-    res.json({ quiz: { id: result.lastInsertRowid, title, description } });
+    const id = await (0, models_1.nextId)('quizzes');
+    const quiz = await models_1.Quiz.create({
+        id,
+        hostId,
+        title,
+        description: description || '',
+        status: status || 'draft',
+        isPublic: !!is_public,
+        category: 'general',
+        playCount: 0,
+        isFavorite: false,
+        folderId: null,
+        deletedAt: null,
+    });
+    res.json({ quiz: { id: quiz.id, title, description } });
 });
-router.post('/:id/clone', auth_1.authenticateToken, (req, res) => {
-    const db = (0, db_1.getDb)();
+router.post('/:id/clone', auth_1.authenticateToken, async (req, res) => {
     const hostId = req.hostId;
-    const sourceId = req.params.id;
-    const source = db.prepare('SELECT * FROM quizzes WHERE id = ? AND is_public = 1').get(sourceId);
+    const sourceId = Number(req.params.id);
+    const source = await models_1.Quiz.findOne({ id: sourceId, isPublic: true });
     if (!source) {
         return res.status(404).json({ error: 'Public quiz not found' });
     }
-    const result = db.prepare('INSERT INTO quizzes (host_id, title, description, is_public, category, status) VALUES (?, ?, ?, 0, ?, ?)').run(hostId, `${source.title} (copy)`, source.description, source.category || 'general', 'published');
-    const newQuizId = result.lastInsertRowid;
-    const questions = db.prepare('SELECT * FROM questions WHERE quiz_id = ? ORDER BY sort_order').all(sourceId);
+    const newQuizId = await (0, models_1.nextId)('quizzes');
+    const newQuiz = await models_1.Quiz.create({
+        id: newQuizId,
+        hostId,
+        title: `${source.title} (copy)`,
+        description: source.description,
+        isPublic: false,
+        category: source.category || 'general',
+        status: 'published',
+        isFavorite: false,
+        folderId: null,
+        deletedAt: null,
+    });
+    const questions = await models_1.Question.find({ quizId: sourceId }).sort({ sortOrder: 1 }).lean();
     for (const q of questions) {
-        const qResult = db.prepare('INSERT INTO questions (quiz_id, question_text, timer_seconds, points, sort_order, correct_index) VALUES (?, ?, ?, ?, ?, ?)').run(newQuizId, q.question_text, q.timer_seconds, q.points, q.sort_order, q.correct_index);
-        const answers = db.prepare('SELECT * FROM answers WHERE question_id = ? ORDER BY sort_index').all(q.id);
-        const insertA = db.prepare('INSERT INTO answers (question_id, sort_index, text, color) VALUES (?, ?, ?, ?)');
+        const questionId = await (0, models_1.nextId)('questions');
+        const newQ = await models_1.Question.create({
+            id: questionId,
+            quizId: newQuizId,
+            questionText: q.questionText,
+            imageUrl: q.imageUrl,
+            timerSeconds: q.timerSeconds,
+            points: q.points,
+            pointsMultiplier: q.pointsMultiplier,
+            sortOrder: q.sortOrder,
+            correctIndex: q.correctIndex,
+        });
+        const answers = await models_1.Answer.find({ questionId: q.id }).sort({ sortIndex: 1 }).lean();
         for (const a of answers) {
-            insertA.run(qResult.lastInsertRowid, a.sort_index, a.text, a.color);
+            const answerId = await (0, models_1.nextId)('answers');
+            await models_1.Answer.create({
+                id: answerId,
+                questionId,
+                sortIndex: a.sortIndex,
+                text: a.text,
+                color: a.color,
+            });
         }
     }
-    db.prepare('UPDATE quizzes SET play_count = play_count + 1 WHERE id = ?').run(sourceId);
+    await models_1.Quiz.updateOne({ id: sourceId }, { $inc: { playCount: 1 } });
     res.json({ quiz: { id: newQuizId, title: `${source.title} (copy)` } });
 });
-router.post('/:id/restore', auth_1.authenticateToken, (req, res) => {
-    const db = (0, db_1.getDb)();
+router.post('/:id/restore', auth_1.authenticateToken, async (req, res) => {
     const hostId = req.hostId;
-    const quizId = req.params.id;
-    const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND host_id = ?').get(quizId, hostId);
+    const quizId = Number(req.params.id);
+    const quiz = await models_1.Quiz.findOne({ id: quizId, hostId });
     if (!quiz)
         return res.status(404).json({ error: 'Quiz not found' });
-    db.prepare('UPDATE quizzes SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(quizId);
+    await models_1.Quiz.updateOne({ id: quizId }, { $set: { deletedAt: null, updatedAt: new Date() } });
     res.json({ success: true });
 });
-router.get('/:id', auth_1.authenticateToken, (req, res) => {
-    const db = (0, db_1.getDb)();
+router.get('/:id', auth_1.authenticateToken, async (req, res) => {
     const hostId = req.hostId;
-    const quizId = req.params.id;
-    const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND host_id = ?').get(quizId, hostId);
+    const quizId = Number(req.params.id);
+    const quiz = await models_1.Quiz.findOne({ id: quizId, hostId });
     if (!quiz) {
         return res.status(404).json({ error: 'Quiz not found' });
     }
-    const questions = db.prepare('SELECT * FROM questions WHERE quiz_id = ? ORDER BY sort_order').all(quizId);
+    const questions = await models_1.Question.find({ quizId }).sort({ sortOrder: 1 }).lean();
     for (const q of questions) {
-        q.answers = db.prepare('SELECT * FROM answers WHERE question_id = ? ORDER BY sort_index').all(q.id);
+        q.answers = await models_1.Answer.find({ questionId: q.id }).sort({ sortIndex: 1 }).lean();
     }
-    res.json({ quiz: { ...quiz, questions } });
+    res.json({ quiz: { ...quiz.toObject(), questions } });
 });
-router.put('/:id', auth_1.authenticateToken, (req, res) => {
-    const db = (0, db_1.getDb)();
+router.put('/:id', auth_1.authenticateToken, async (req, res) => {
     const hostId = req.hostId;
-    const quizId = req.params.id;
+    const quizId = Number(req.params.id);
     const { title, description, status, is_public, is_favorite, folderId } = req.body;
-    const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND host_id = ?').get(quizId, hostId);
+    const quiz = await models_1.Quiz.findOne({ id: quizId, hostId });
     if (!quiz) {
         return res.status(404).json({ error: 'Quiz not found' });
     }
-    db.prepare(`
-    UPDATE quizzes SET
-      title = COALESCE(?, title),
-      description = COALESCE(?, description),
-      status = COALESCE(?, status),
-      is_public = COALESCE(?, is_public),
-      is_favorite = COALESCE(?, is_favorite),
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).run(title, description, status, is_public !== undefined ? (is_public ? 1 : 0) : null, is_favorite !== undefined ? (is_favorite ? 1 : 0) : null, quizId);
-    if (folderId !== undefined) {
-        db.prepare('DELETE FROM quiz_folders WHERE quiz_id = ?').run(quizId);
-        if (folderId) {
-            db.prepare('INSERT INTO quiz_folders (quiz_id, folder_id) VALUES (?, ?)').run(quizId, folderId);
-        }
-    }
+    const update = { updatedAt: new Date() };
+    if (title !== undefined)
+        update.title = title;
+    if (description !== undefined)
+        update.description = description;
+    if (status !== undefined)
+        update.status = status;
+    if (is_public !== undefined)
+        update.isPublic = !!is_public;
+    if (is_favorite !== undefined)
+        update.isFavorite = !!is_favorite;
+    if (folderId !== undefined)
+        update.folderId = folderId ? Number(folderId) : null;
+    await models_1.Quiz.updateOne({ id: quizId }, { $set: update });
     res.json({ success: true });
 });
-router.delete('/:id', auth_1.authenticateToken, (req, res) => {
-    const db = (0, db_1.getDb)();
+router.delete('/:id', auth_1.authenticateToken, async (req, res) => {
     const hostId = req.hostId;
-    const quizId = req.params.id;
+    const quizId = Number(req.params.id);
     const permanent = req.query.permanent === 'true';
-    const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND host_id = ?').get(quizId, hostId);
+    const quiz = await models_1.Quiz.findOne({ id: quizId, hostId });
     if (!quiz) {
         return res.status(404).json({ error: 'Quiz not found' });
     }
     if (permanent) {
-        db.prepare('DELETE FROM quizzes WHERE id = ?').run(quizId);
+        const qs = await models_1.Question.find({ quizId }).lean();
+        for (const q of qs) {
+            await models_1.Answer.deleteMany({ questionId: q.id });
+        }
+        await models_1.Question.deleteMany({ quizId });
+        await models_1.Quiz.deleteOne({ id: quizId });
     }
     else {
-        db.prepare('UPDATE quizzes SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?').run(quizId);
+        await models_1.Quiz.updateOne({ id: quizId }, { $set: { deletedAt: new Date(), updatedAt: new Date() } });
     }
     res.json({ success: true });
 });
-router.post('/:id/questions', auth_1.authenticateToken, (req, res) => {
-    const db = (0, db_1.getDb)();
+router.post('/:id/questions', auth_1.authenticateToken, async (req, res) => {
     const hostId = req.hostId;
-    const quizId = req.params.id;
-    const { question_text, timer_seconds, points, correct_index, answers } = req.body;
-    const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND host_id = ?').get(quizId, hostId);
+    const quizId = Number(req.params.id);
+    const { question_text, timer_seconds, points, correct_index, answers, questionType } = req.body;
+    const quiz = await models_1.Quiz.findOne({ id: quizId, hostId });
     if (!quiz) {
         return res.status(404).json({ error: 'Quiz not found' });
     }
     if (!question_text || !answers || answers.length < 2) {
         return res.status(400).json({ error: 'Question text and at least 2 answers are required' });
     }
-    const maxOrder = db.prepare('SELECT MAX(sort_order) as max_order FROM questions WHERE quiz_id = ?').get(quizId);
-    const sortOrder = (maxOrder?.max_order ?? -1) + 1;
-    const result = db.prepare('INSERT INTO questions (quiz_id, question_text, timer_seconds, points, sort_order, correct_index) VALUES (?, ?, ?, ?, ?, ?)').run(quizId, question_text, timer_seconds || 20, points || 1000, sortOrder, correct_index ?? 0);
-    const questionId = result.lastInsertRowid;
-    const colors = ['red', 'blue', 'yellow', 'green'];
-    const insertAnswer = db.prepare('INSERT INTO answers (question_id, sort_index, text, color) VALUES (?, ?, ?, ?)');
+    const last = await models_1.Question.findOne({ quizId }).sort({ sortOrder: -1 }).lean();
+    const sortOrder = (last?.sortOrder ?? -1) + 1;
+    const questionId = await (0, models_1.nextId)('questions');
+    await models_1.Question.create({
+        id: questionId,
+        quizId,
+        questionText: question_text,
+        imageUrl: null,
+        timerSeconds: timer_seconds || 20,
+        points: points || 1000,
+        pointsMultiplier: 1.0,
+        sortOrder,
+        correctIndex: correct_index ?? 0,
+        questionType: questionType || 'multiple_choice',
+    });
     for (let i = 0; i < answers.length; i++) {
-        insertAnswer.run(questionId, i, answers[i].text || answers[i], answers[i].color || colors[i]);
+        const answerId = await (0, models_1.nextId)('answers');
+        await models_1.Answer.create({
+            id: answerId,
+            questionId,
+            sortIndex: i,
+            text: answers[i].text || answers[i],
+            color: answers[i].color || COLORS[i] || 'red',
+        });
     }
-    db.prepare('UPDATE quizzes SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(quizId);
+    await models_1.Quiz.updateOne({ id: quizId }, { $set: { updatedAt: new Date() } });
     res.json({ question: { id: questionId } });
 });
-router.put('/:id/questions/:qid', auth_1.authenticateToken, (req, res) => {
-    const db = (0, db_1.getDb)();
+router.put('/:id/questions/:qid', auth_1.authenticateToken, async (req, res) => {
     const hostId = req.hostId;
-    const quizId = req.params.id;
-    const questionId = req.params.qid;
-    const { question_text, timer_seconds, points, correct_index, answers } = req.body;
-    const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND host_id = ?').get(quizId, hostId);
+    const quizId = Number(req.params.id);
+    const questionId = Number(req.params.qid);
+    const { question_text, timer_seconds, points, correct_index, answers, questionType } = req.body;
+    const quiz = await models_1.Quiz.findOne({ id: quizId, hostId });
     if (!quiz) {
         return res.status(404).json({ error: 'Quiz not found' });
     }
-    db.prepare('UPDATE questions SET question_text = COALESCE(?, question_text), timer_seconds = COALESCE(?, timer_seconds), points = COALESCE(?, points), correct_index = COALESCE(?, correct_index) WHERE id = ? AND quiz_id = ?').run(question_text, timer_seconds, points, correct_index, questionId, quizId);
+    const update = {};
+    if (question_text !== undefined)
+        update.questionText = question_text;
+    if (timer_seconds !== undefined)
+        update.timerSeconds = timer_seconds;
+    if (points !== undefined)
+        update.points = points;
+    if (correct_index !== undefined)
+        update.correctIndex = correct_index;
+    if (questionType !== undefined)
+        update.questionType = questionType;
+    if (Object.keys(update).length > 0) {
+        await models_1.Question.updateOne({ id: questionId, quizId }, { $set: update });
+    }
     if (answers && answers.length > 0) {
-        db.prepare('DELETE FROM answers WHERE question_id = ?').run(questionId);
-        const colors = ['red', 'blue', 'yellow', 'green'];
-        const insertAnswer = db.prepare('INSERT INTO answers (question_id, sort_index, text, color) VALUES (?, ?, ?, ?)');
+        await models_1.Answer.deleteMany({ questionId });
         for (let i = 0; i < answers.length; i++) {
-            insertAnswer.run(questionId, i, answers[i].text || answers[i], answers[i].color || colors[i]);
+            const answerId = await (0, models_1.nextId)('answers');
+            await models_1.Answer.create({
+                id: answerId,
+                questionId,
+                sortIndex: i,
+                text: answers[i].text || answers[i],
+                color: answers[i].color || COLORS[i] || 'red',
+            });
         }
     }
-    db.prepare('UPDATE quizzes SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(quizId);
+    await models_1.Quiz.updateOne({ id: quizId }, { $set: { updatedAt: new Date() } });
     res.json({ success: true });
 });
-router.delete('/:id/questions/:qid', auth_1.authenticateToken, (req, res) => {
-    const db = (0, db_1.getDb)();
+router.delete('/:id/questions/:qid', auth_1.authenticateToken, async (req, res) => {
     const hostId = req.hostId;
-    const quizId = req.params.id;
-    const questionId = req.params.qid;
-    const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND host_id = ?').get(quizId, hostId);
+    const quizId = Number(req.params.id);
+    const questionId = Number(req.params.qid);
+    const quiz = await models_1.Quiz.findOne({ id: quizId, hostId });
     if (!quiz) {
         return res.status(404).json({ error: 'Quiz not found' });
     }
-    db.prepare('DELETE FROM questions WHERE id = ? AND quiz_id = ?').run(questionId, quizId);
-    db.prepare('UPDATE quizzes SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(quizId);
+    await models_1.Question.deleteOne({ id: questionId, quizId });
+    await models_1.Answer.deleteMany({ questionId });
+    await models_1.Quiz.updateOne({ id: quizId }, { $set: { updatedAt: new Date() } });
     res.json({ success: true });
 });
 exports.default = router;

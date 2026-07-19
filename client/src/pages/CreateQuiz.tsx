@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
+import type { QuestionType } from '@shared/types';
 
 interface AnswerOption {
   text: string;
@@ -13,10 +14,16 @@ interface QuestionForm {
   points: number;
   correct_index: number;
   answers: AnswerOption[];
+  questionType: QuestionType;
 }
 
 const COLORS = ['red', 'blue', 'yellow', 'green'];
 const SHAPES = ['▲', '◆', '●', '■'];
+const QUESTION_TYPES: { value: QuestionType; label: string }[] = [
+  { value: 'multiple_choice', label: 'Multiple Choice' },
+  { value: 'true_false', label: 'True / False' },
+  { value: 'open_ended', label: 'Open Ended' },
+];
 
 const SAMPLE_QUIZ: { title: string; description: string; questions: QuestionForm[] } = {
   title: 'General Knowledge Trivia',
@@ -33,6 +40,7 @@ const SAMPLE_QUIZ: { title: string; description: string; questions: QuestionForm
         { text: 'Tokyo', color: 'yellow' },
         { text: 'Seoul', color: 'green' },
       ],
+      questionType: 'multiple_choice',
     },
     {
       question_text: 'The Great Wall of China is visible from space with the naked eye.',
@@ -42,9 +50,8 @@ const SAMPLE_QUIZ: { title: string; description: string; questions: QuestionForm
       answers: [
         { text: 'True', color: 'red' },
         { text: 'False', color: 'blue' },
-        { text: '', color: 'yellow' },
-        { text: '', color: 'green' },
       ],
+      questionType: 'true_false',
     },
   ],
 };
@@ -68,6 +75,7 @@ export default function CreateQuiz() {
       { text: '', color: 'yellow' },
       { text: '', color: 'green' },
     ],
+    questionType: 'multiple_choice',
   });
   const [saving, setSaving] = useState(false);
   const [showAddForm, setShowAddForm] = useState(true);
@@ -84,6 +92,7 @@ export default function CreateQuiz() {
         points: q.points,
         correct_index: q.correct_index,
         answers: q.answers.map((a: any) => ({ text: a.text, color: a.color })),
+        questionType: q.questionType || 'multiple_choice',
       })));
     } catch (err) {
       alert('Failed to load quiz');
@@ -114,7 +123,8 @@ export default function CreateQuiz() {
       alert('Please enter a question');
       return;
     }
-    if (currentQ.answers.filter(a => a.text.trim()).length < 2) {
+    const validAnswers = currentQ.answers.filter(a => a.text.trim());
+    if (validAnswers.length < 2) {
       alert('Please enter at least 2 answers');
       return;
     }
@@ -131,11 +141,45 @@ export default function CreateQuiz() {
         { text: '', color: 'yellow' },
         { text: '', color: 'green' },
       ],
+      questionType: 'multiple_choice',
     });
   };
 
   const handleRemoveQuestion = (index: number) => {
     setQuestions(questions.filter((_, i) => i !== index));
+  };
+
+  const handleQuestionTypeChange = (type: QuestionType) => {
+    if (type === 'true_false') {
+      setCurrentQ({
+        ...currentQ,
+        questionType: type,
+        answers: [
+          { text: 'True', color: 'red' },
+          { text: 'False', color: 'blue' },
+        ],
+        correct_index: 0,
+      });
+    } else if (type === 'open_ended') {
+      setCurrentQ({
+        ...currentQ,
+        questionType: type,
+        answers: [{ text: '', color: 'red' }],
+        correct_index: 0,
+      });
+    } else {
+      setCurrentQ({
+        ...currentQ,
+        questionType: type,
+        answers: [
+          { text: '', color: 'red' },
+          { text: '', color: 'blue' },
+          { text: '', color: 'yellow' },
+          { text: '', color: 'green' },
+        ],
+        correct_index: 0,
+      });
+    }
   };
 
   const handleSave = async () => {
@@ -157,7 +201,6 @@ export default function CreateQuiz() {
         quizId = quizData.quiz.id;
       } else {
         await api.quizzes.update(quizId!, { title, description });
-        // Delete existing questions and re-add
         const existing = await api.quizzes.get(quizId!);
         for (const q of existing.quiz.questions) {
           await api.quizzes.deleteQuestion(quizId!, q.id);
@@ -170,6 +213,7 @@ export default function CreateQuiz() {
           timer_seconds: q.timer_seconds,
           points: q.points,
           correct_index: q.correct_index,
+          questionType: q.questionType,
           answers: q.answers.filter(a => a.text.trim()),
         });
       }
@@ -244,7 +288,7 @@ export default function CreateQuiz() {
                 <div className="flex-1">
                   <div className="font-bold text-gray-800">{q.question_text}</div>
                   <div className="text-sm text-gray-400">
-                    {q.timer_seconds}s · {q.points} pts · {q.answers.filter(a => a.text).length} answers
+                    {q.timer_seconds}s · {q.points} pts · {q.answers.filter(a => a.text).length} answers · {q.questionType}
                   </div>
                 </div>
                 <button
@@ -275,27 +319,50 @@ export default function CreateQuiz() {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-              {currentQ.answers.map((answer, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="text-2xl">{SHAPES[i]}</span>
-                  <input
-                    type="text"
-                    value={answer.text}
-                    onChange={(e) => updateAnswer(i, e.target.value)}
-                    placeholder={`Answer ${i + 1}`}
-                    className="flex-1 py-2 px-3 border-2 border-gray-200 rounded-lg focus:border-animplay-purple focus:outline-none"
-                  />
-                  <input
-                    type="radio"
-                    name="correct"
-                    checked={currentQ.correct_index === i}
-                    onChange={() => setCurrentQ({ ...currentQ, correct_index: i })}
-                    className="w-5 h-5"
-                  />
-                </div>
-              ))}
+            <div className="mb-4">
+              <label className="text-sm text-gray-500 font-bold">Question Type</label>
+              <select
+                value={currentQ.questionType}
+                onChange={(e) => handleQuestionTypeChange(e.target.value as QuestionType)}
+                className="block w-full py-2 px-3 border-2 border-gray-200 rounded-lg mt-1"
+              >
+                {QUESTION_TYPES.map(type => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
             </div>
+
+            {currentQ.questionType !== 'open_ended' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                {currentQ.answers.map((answer, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-2xl">{SHAPES[i]}</span>
+                    <input
+                      type="text"
+                      value={answer.text}
+                      onChange={(e) => updateAnswer(i, e.target.value)}
+                      placeholder={`Answer ${i + 1}`}
+                      className="flex-1 py-2 px-3 border-2 border-gray-200 rounded-lg focus:border-animplay-purple focus:outline-none"
+                    />
+                    <input
+                      type="radio"
+                      name="correct"
+                      checked={currentQ.correct_index === i}
+                      onChange={() => setCurrentQ({ ...currentQ, correct_index: i })}
+                      className="w-5 h-5"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {currentQ.questionType === 'open_ended' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                <p className="text-blue-700 text-sm">
+                  Open-ended questions have no predefined answers. The host will manually judge player responses during the game.
+                </p>
+              </div>
+            )}
 
             <div className="flex gap-4 mb-4">
               <div>
@@ -305,12 +372,12 @@ export default function CreateQuiz() {
                   onChange={(e) => setCurrentQ({ ...currentQ, timer_seconds: Number(e.target.value) })}
                   className="block w-full py-2 px-3 border-2 border-gray-200 rounded-lg"
                 >
-                  <option value={5}>5s</option>
-                  <option value={10}>10s</option>
-                  <option value={20}>20s</option>
-                  <option value={30}>30s</option>
-                  <option value={60}>60s</option>
-                  <option value={120}>120s</option>
+                  <option value="5">5s</option>
+                  <option value="10">10s</option>
+                  <option value="20">20s</option>
+                  <option value="30">30s</option>
+                  <option value="60">60s</option>
+                  <option value="120">120s</option>
                 </select>
               </div>
               <div>
@@ -320,9 +387,9 @@ export default function CreateQuiz() {
                   onChange={(e) => setCurrentQ({ ...currentQ, points: Number(e.target.value) })}
                   className="block w-full py-2 px-3 border-2 border-gray-200 rounded-lg"
                 >
-                  <option value={0}>No points</option>
-                  <option value={500}>500</option>
-                  <option value={1000}>1000</option>
+                  <option value="0">No points</option>
+                  <option value="500">500</option>
+                  <option value="1000">1000</option>
                 </select>
               </div>
             </div>

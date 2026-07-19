@@ -1,4 +1,4 @@
-export declare function calculatePoints(timerSeconds: number, responseTimeMs: number, maxPoints?: number, streak?: number): {
+export declare function calculatePoints(timerSeconds: number, responseTimeMs: number, maxPoints?: number, streak?: number, pointsMultiplier?: number): {
     points: number;
     streakBonus: number;
 };

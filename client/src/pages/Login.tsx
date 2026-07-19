@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 import { api } from '../services/api';
 
 export default function Login() {
@@ -22,6 +23,21 @@ export default function Login() {
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    setError('');
+    setLoading(true);
+    try {
+      const data = await api.auth.google(credentialResponse.credential);
+      localStorage.setItem('animplay_token', data.token);
+      localStorage.setItem('animplay_host', JSON.stringify(data.host));
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Google sign-in failed');
     } finally {
       setLoading(false);
     }
@@ -90,6 +106,27 @@ export default function Login() {
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>
+
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setError('Google sign-in failed')}
+                theme="outline"
+                shape="pill"
+                text="signin_with"
+              />
+            </div>
+          </div>
 
           <div className="mt-6 text-center text-gray-500">
             Don't have an account?{' '}

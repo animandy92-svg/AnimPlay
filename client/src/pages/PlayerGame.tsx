@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
+import type { QuestionType, PowerUp as IPowerUp, ChatMessage as IChatMessage } from '@shared/types';
 
 interface QuestionData {
   questionId: number;
@@ -9,6 +10,7 @@ interface QuestionData {
   startsAt: number;
   questionIndex: number;
   totalQuestions: number;
+  questionType: QuestionType;
 }
 
 interface AnswerShape {
@@ -35,6 +37,10 @@ export default function PlayerGame() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [myScore, setMyScore] = useState(0);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
+  const [powerUps, setPowerUps] = useState<IPowerUp[]>([]);
+  const [chatMessages, setChatMessages] = useState<IChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [reactions, setReactions] = useState<{ playerId: string; reaction: string }[]>([]);
   const timerRef = useRef<number | null>(null);
   const navigate = useNavigate();
   const { emit, on } = useSocket();
@@ -45,6 +51,8 @@ export default function PlayerGame() {
     { shape: '●', color: 'yellow', colorClass: 'bg-animplay-yellow' },
     { shape: '■', color: 'green', colorClass: 'bg-animplay-green' },
   ];
+
+  const EMOJIS = ['👍', '❤️', '😂', '😮', '👏', '🔥'];
 
   useEffect(() => {
     const unsubQuestion = on('player-question-start', (data: QuestionData) => {
@@ -102,11 +110,37 @@ export default function PlayerGame() {
       navigate('/join');
     });
 
+    const unsubPowerupPurchased = on('powerup-purchased', (data: { playerId: string; powerUpId: number; remainingPoints: number }) => {
+      setMyScore(data.remainingPoints);
+    });
+
+    const unsubChatReceived = on('chat-received', (data: { playerId: string; nickname: string; message: string; type: string }) => {
+      setChatMessages(prev => [...prev, {
+        id: Date.now(),
+        gameId: 0,
+        playerId: data.playerId,
+        nickname: data.nickname,
+        message: data.message,
+        type: data.type as 'chat' | 'reaction',
+        createdAt: new Date().toISOString(),
+      }]);
+    });
+
+    const unsubReactionReceived = on('reaction-received', (data: { playerId: string; reaction: string }) => {
+      setReactions(prev => [...prev, { playerId: data.playerId, reaction: data.reaction }]);
+      setTimeout(() => {
+        setReactions(prev => prev.filter(r => r.playerId !== data.playerId));
+      }, 2000);
+    });
+
     return () => {
       unsubQuestion();
       unsubResults();
       unsubGameEnd();
       unsubHostDisconnected();
+      unsubPowerupPurchased();
+      unsubChatReceived();
+      unsubReactionReceived();
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [on, navigate, selectedAnswer]);
@@ -127,6 +161,19 @@ export default function PlayerGame() {
     },
     [emit, question, selectedAnswer, timeLeft]
   );
+
+  const handleSendChat = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    const gamePin = localStorage.getItem('animplay_player_gamePin') || '';
+    emit('chat-message', { gamePin, message: chatInput.trim() });
+    setChatInput('');
+  };
+
+  const handleReaction = (reaction: string) => {
+    const gamePin = localStorage.getItem('animplay_player_gamePin') || '';
+    emit('send-reaction', { gamePin, reaction });
+  };
 
   if (phase === 'countdown') {
     return (
@@ -171,40 +218,72 @@ export default function PlayerGame() {
         <div className="flex-1 flex items-center justify-center mb-6">
           <div className="bg-white rounded-3xl p-6 shadow-2xl w-full max-w-2xl text-center">
             <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
-              Look at the main screen!
+              {question.questionType === 'open_ended' ? 'Type your answer below!' : 'Look at the main screen!'}
             </h2>
+            {question.questionType === 'open_ended' && (
+              <input
+                type="text"
+                className="mt-4 w-full text-center text-xl py-3 px-4 border-2 border-gray-200 rounded-xl focus:border-animplay-purple focus:outline-none"
+                placeholder="Your answer..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAnswer(0);
+                }}
+              />
+            )}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto w-full">
-          {visibleShapes.map((answerShape, i) => {
-            const isSelected = selectedAnswer === i;
-            const showCorrect = selectedAnswer !== null && i === correctIndex;
-            const showWrong = selectedAnswer === i && selectedAnswer !== correctIndex;
+        {question.questionType !== 'open_ended' && (
+          <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto w-full">
+            {visibleShapes.map((answerShape, i) => {
+              const isSelected = selectedAnswer === i;
+              const showCorrect = selectedAnswer !== null && i === correctIndex;
+              const showWrong = selectedAnswer === i && selectedAnswer !== correctIndex;
 
-            return (
-              <button
-                key={i}
-                onClick={() => handleAnswer(i)}
-                disabled={selectedAnswer !== null}
-                className={`
-                  ${answerShape.colorClass} text-white font-display text-4xl py-10 px-4 rounded-2xl
-                  transition-all duration-200 shadow-lg
-                  ${isSelected ? 'ring-4 ring-white scale-95' : 'hover:scale-105'}
-                  ${showCorrect ? 'ring-4 ring-green-400 animate-pulse' : ''}
-                  ${showWrong ? 'opacity-50 scale-95' : ''}
-                  ${selectedAnswer !== null && !isSelected && !showCorrect ? 'opacity-50' : ''}
-                `}
-              >
-                {answerShape.shape}
-              </button>
-            );
-          })}
-        </div>
+              return (
+                <button
+                  key={i}
+                  onClick={() => handleAnswer(i)}
+                  disabled={selectedAnswer !== null}
+                  className={`
+                    ${answerShape.colorClass} text-white font-display text-4xl py-10 px-4 rounded-2xl
+                    transition-all duration-200 shadow-lg
+                    ${isSelected ? 'ring-4 ring-white scale-95' : 'hover:scale-105'}
+                    ${showCorrect ? 'ring-4 ring-green-400 animate-pulse' : ''}
+                    ${showWrong ? 'opacity-50 scale-95' : ''}
+                    ${selectedAnswer !== null && !isSelected && !showCorrect ? 'opacity-50' : ''}
+                  `}
+                >
+                  {answerShape.shape}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="text-center mt-4 text-white/80">
           Score: {myScore.toLocaleString()}
         </div>
+
+        <div className="fixed bottom-4 right-4 flex flex-col gap-2">
+          {EMOJIS.map(emoji => (
+            <button
+              key={emoji}
+              onClick={() => handleReaction(emoji)}
+              className="bg-white/20 hover:bg-white/30 text-white text-2xl w-10 h-10 rounded-full transition-colors"
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+
+        {reactions.length > 0 && (
+          <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
+            {reactions.map((r, i) => (
+              <span key={i} className="text-3xl animate-bounce-in">{r.reaction}</span>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -219,7 +298,7 @@ export default function PlayerGame() {
           <h2 className="font-display text-3xl mb-2" style={{
             color: isCorrect ? '#26890C' : isCorrect === false ? '#E21B3C' : '#666'
           }}>
-            {isCorrect ? 'Correct!' : isCorrect === false ? 'Wrong!' : 'Time\'s up!'}
+            {isCorrect ? 'Correct!' : isCorrect === false ? 'Wrong!' : "Time's up!"}
           </h2>
 
           {stats.length > 0 && (
@@ -239,6 +318,17 @@ export default function PlayerGame() {
               ))}
             </div>
           )}
+
+          <div className="mt-4 text-sm text-gray-500">
+            Chat:
+            <div className="max-h-32 overflow-y-auto mt-2 space-y-1">
+              {chatMessages.slice(-5).map(msg => (
+                <div key={msg.id} className="text-left text-xs">
+                  <span className="font-bold">{msg.nickname}:</span> {msg.message}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );

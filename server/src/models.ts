@@ -4,62 +4,65 @@ export interface IHost extends Document {
   id: number;
   username: string;
   email: string;
-  password: string;
+  password?: string;
+  provider?: string;
+  googleId?: string;
   created_at: Date;
 }
 
 export interface IQuiz extends Document {
   id: number;
-  host_id: number;
+  hostId: number;
   title: string;
   description: string;
-  cover_image: string | null;
-  is_public: boolean;
+  coverImage: string | null;
+  isPublic: boolean;
   category: string;
-  play_count: number;
+  playCount: number;
   status: string;
-  is_favorite: boolean;
-  folder_id: number | null;
-  deleted_at: Date | null;
+  isFavorite: boolean;
+  folderId: number | null;
+  deletedAt: Date | null;
   created_at: Date;
   updated_at: Date;
 }
 
 export interface IQuestion extends Document {
   id: number;
-  quiz_id: number;
-  question_text: string;
-  image_url: string | null;
-  timer_seconds: number;
+  quizId: number;
+  questionText: string;
+  imageUrl: string | null;
+  timerSeconds: number;
   points: number;
-  points_multiplier: number;
-  sort_order: number;
-  correct_index: number;
+  pointsMultiplier: number;
+  sortOrder: number;
+  correctIndex: number;
+  questionType: 'multiple_choice' | 'true_false' | 'open_ended';
 }
 
 export interface IAnswer extends Document {
   id: number;
-  question_id: number;
-  sort_index: number;
+  questionId: number;
+  sortIndex: number;
   text: string;
   color: string;
 }
 
 export interface IGame extends Document {
   id: number;
-  game_pin: string;
-  quiz_id: number;
-  host_id: number;
+  gamePin: string;
+  quizId: number;
+  hostId: number;
   status: string;
-  current_question: number;
-  started_at: Date | null;
-  ended_at: Date | null;
+  currentQuestion: number;
+  startedAt: Date | null;
+  endedAt: Date | null;
   created_at: Date;
 }
 
 export interface IGameResult extends Document {
   id: number;
-  game_id: number;
+  gameId: number;
   nickname: string;
   score: number;
   correct: number;
@@ -70,43 +73,85 @@ export interface IGameResult extends Document {
 
 export interface IFolder extends Document {
   id: number;
-  host_id: number;
+  hostId: number;
   name: string;
 }
 
 export interface IGroup extends Document {
   id: number;
-  owner_id: number;
+  ownerId: number;
   name: string;
   description: string;
-  invite_code: string;
+  inviteCode: string;
   created_at: Date;
 }
 
 export interface IGroupMember extends Document {
   id: number;
-  group_id: number;
-  host_id: number;
+  groupId: number;
+  hostId: number;
   role: string;
   joined_at: Date;
 }
 
 export interface IAssignment extends Document {
   id: number;
-  group_id: number;
-  quiz_id: number;
+  groupId: number;
+  quizId: number;
   title: string;
-  due_date: Date | null;
-  created_by: number;
+  dueDate: Date | null;
+  createdBy: number;
   created_at: Date;
 }
 
 export interface IAssignmentCompletion extends Document {
   id: number;
-  assignment_id: number;
-  host_id: number;
-  completed_at: Date | null;
+  assignmentId: number;
+  hostId: number;
+  completedAt: Date | null;
   score: number;
+}
+
+export interface ITeam extends Document {
+  id: number;
+  gameId: number;
+  name: string;
+  color: string;
+  score: number;
+}
+
+export interface ITeamMember extends Document {
+  id: number;
+  teamId: number;
+  gameId: number;
+  playerId: string;
+  nickname: string;
+}
+
+export interface IPowerUp extends Document {
+  id: number;
+  name: string;
+  description: string;
+  icon: string;
+  cost: number;
+}
+
+export interface IPlayerPowerUp extends Document {
+  id: number;
+  gameId: number;
+  playerId: string;
+  powerUpId: number;
+  used: boolean;
+}
+
+export interface IChatMessage extends Document {
+  id: number;
+  gameId: number;
+  playerId: string;
+  nickname: string;
+  message: string;
+  type: 'chat' | 'reaction';
+  createdAt: Date;
 }
 
 interface ICounter extends Document {
@@ -134,62 +179,65 @@ const hostSchema = new Schema<IHost>({
   id: { type: Number, unique: true },
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
+  password: { type: String },
+  provider: { type: String, default: 'local' },
+  googleId: { type: String, unique: true, sparse: true },
   created_at: { type: Date, default: Date.now },
 });
 
 const quizSchema = new Schema<IQuiz>({
   id: { type: Number, unique: true },
-  host_id: { type: Number, required: true, index: true },
+  hostId: { type: Number, required: true, index: true },
   title: { type: String, required: true },
   description: { type: String, default: '' },
-  cover_image: { type: String, default: null },
-  is_public: { type: Boolean, default: true },
+  coverImage: { type: String, default: null },
+  isPublic: { type: Boolean, default: true },
   category: { type: String, default: 'general' },
-  play_count: { type: Number, default: 0 },
+  playCount: { type: Number, default: 0 },
   status: { type: String, default: 'published' },
-  is_favorite: { type: Boolean, default: false },
-  folder_id: { type: Number, default: null, index: true },
-  deleted_at: { type: Date, default: null },
+  isFavorite: { type: Boolean, default: false },
+  folderId: { type: Number, default: null, index: true },
+  deletedAt: { type: Date, default: null },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
 });
 
 const questionSchema = new Schema<IQuestion>({
   id: { type: Number, unique: true },
-  quiz_id: { type: Number, required: true, index: true },
-  question_text: { type: String, required: true },
-  image_url: { type: String, default: null },
-  timer_seconds: { type: Number, default: 20 },
+  quizId: { type: Number, required: true, index: true },
+  questionText: { type: String, required: true },
+  imageUrl: { type: String, default: null },
+  timerSeconds: { type: Number, default: 20 },
   points: { type: Number, default: 1000 },
-  points_multiplier: { type: Number, default: 1.0 },
-  sort_order: { type: Number, required: true },
-  correct_index: { type: Number, required: true },
+  pointsMultiplier: { type: Number, default: 1.0 },
+  sortOrder: { type: Number, required: true },
+  correctIndex: { type: Number, required: true },
+  questionType: { type: String, enum: ['multiple_choice', 'true_false', 'open_ended'], default: 'multiple_choice' },
 });
 
 const answerSchema = new Schema<IAnswer>({
   id: { type: Number, unique: true },
-  question_id: { type: Number, required: true, index: true },
-  sort_index: { type: Number, required: true },
+  questionId: { type: Number, required: true, index: true },
+  sortIndex: { type: Number, required: true },
   text: { type: String, required: true },
   color: { type: String, default: 'red' },
 });
 
 const gameSchema = new Schema<IGame>({
   id: { type: Number, unique: true },
-  game_pin: { type: String, required: true, unique: true },
-  quiz_id: { type: Number, required: true, index: true },
-  host_id: { type: Number, required: true, index: true },
+  gamePin: { type: String, required: true, unique: true },
+  quizId: { type: Number, required: true, index: true },
+  hostId: { type: Number, required: true, index: true },
   status: { type: String, default: 'lobby' },
-  current_question: { type: Number, default: 0 },
-  started_at: { type: Date, default: null },
-  ended_at: { type: Date, default: null },
+  currentQuestion: { type: Number, default: 0 },
+  startedAt: { type: Date, default: null },
+  endedAt: { type: Date, default: null },
   created_at: { type: Date, default: Date.now },
 });
 
 const gameResultSchema = new Schema<IGameResult>({
   id: { type: Number, unique: true },
-  game_id: { type: Number, required: true, index: true },
+  gameId: { type: Number, required: true, index: true },
   nickname: { type: String, required: true },
   score: { type: Number, default: 0 },
   correct: { type: Number, default: 0 },
@@ -200,43 +248,85 @@ const gameResultSchema = new Schema<IGameResult>({
 
 const folderSchema = new Schema<IFolder>({
   id: { type: Number, unique: true },
-  host_id: { type: Number, required: true, index: true },
+  hostId: { type: Number, required: true, index: true },
   name: { type: String, required: true },
 });
 
 const groupSchema = new Schema<IGroup>({
   id: { type: Number, unique: true },
-  owner_id: { type: Number, required: true, index: true },
+  ownerId: { type: Number, required: true, index: true },
   name: { type: String, required: true },
   description: { type: String, default: '' },
-  invite_code: { type: String, required: true, unique: true },
+  inviteCode: { type: String, required: true, unique: true },
   created_at: { type: Date, default: Date.now },
 });
 
 const groupMemberSchema = new Schema<IGroupMember>({
   id: { type: Number, unique: true },
-  group_id: { type: Number, required: true, index: true },
-  host_id: { type: Number, required: true, index: true },
+  groupId: { type: Number, required: true, index: true },
+  hostId: { type: Number, required: true, index: true },
   role: { type: String, default: 'member' },
   joined_at: { type: Date, default: Date.now },
 });
 
 const assignmentSchema = new Schema<IAssignment>({
   id: { type: Number, unique: true },
-  group_id: { type: Number, required: true, index: true },
-  quiz_id: { type: Number, required: true, index: true },
+  groupId: { type: Number, required: true, index: true },
+  quizId: { type: Number, required: true, index: true },
   title: { type: String, required: true },
-  due_date: { type: Date, default: null },
-  created_by: { type: Number, required: true },
+  dueDate: { type: Date, default: null },
+  createdBy: { type: Number, required: true },
   created_at: { type: Date, default: Date.now },
 });
 
 const assignmentCompletionSchema = new Schema<IAssignmentCompletion>({
   id: { type: Number, unique: true },
-  assignment_id: { type: Number, required: true, index: true },
-  host_id: { type: Number, required: true, index: true },
-  completed_at: { type: Date, default: null },
+  assignmentId: { type: Number, required: true, index: true },
+  hostId: { type: Number, required: true, index: true },
+  completedAt: { type: Date, default: null },
   score: { type: Number, default: 0 },
+});
+
+const teamSchema = new Schema<ITeam>({
+  id: { type: Number, unique: true },
+  gameId: { type: Number, required: true, index: true },
+  name: { type: String, required: true },
+  color: { type: String, required: true },
+  score: { type: Number, default: 0 },
+});
+
+const teamMemberSchema = new Schema<ITeamMember>({
+  id: { type: Number, unique: true },
+  teamId: { type: Number, required: true, index: true },
+  gameId: { type: Number, required: true, index: true },
+  playerId: { type: String, required: true },
+  nickname: { type: String, required: true },
+});
+
+const powerUpSchema = new Schema<IPowerUp>({
+  id: { type: Number, unique: true },
+  name: { type: String, required: true, unique: true },
+  description: { type: String, required: true },
+  icon: { type: String, required: true },
+  cost: { type: Number, required: true },
+});
+
+const playerPowerUpSchema = new Schema<IPlayerPowerUp>({
+  id: { type: Number, unique: true },
+  gameId: { type: Number, required: true, index: true },
+  playerId: { type: String, required: true, index: true },
+  powerUpId: { type: Number, required: true },
+  used: { type: Boolean, default: false },
+});
+
+const chatMessageSchema = new Schema<IChatMessage>({
+  id: { type: Number, unique: true },
+  gameId: { type: Number, required: true, index: true },
+  playerId: { type: String, required: true },
+  nickname: { type: String, required: true },
+  message: { type: String, required: true },
+  type: { type: String, enum: ['chat', 'reaction'], default: 'chat' },
+  createdAt: { type: Date, default: Date.now },
 });
 
 export const Host = mongoose.model<IHost>('Host', hostSchema);
@@ -253,20 +343,11 @@ export const AssignmentCompletion = mongoose.model<IAssignmentCompletion>(
   'AssignmentCompletion',
   assignmentCompletionSchema
 );
-
-export type {
-  IHost,
-  IQuiz,
-  IQuestion,
-  IAnswer,
-  IGame,
-  IGameResult,
-  IFolder,
-  IGroup,
-  IGroupMember,
-  IAssignment,
-  IAssignmentCompletion,
-};
+export const Team = mongoose.model<ITeam>('Team', teamSchema);
+export const TeamMember = mongoose.model<ITeamMember>('TeamMember', teamMemberSchema);
+export const PowerUp = mongoose.model<IPowerUp>('PowerUp', powerUpSchema);
+export const PlayerPowerUp = mongoose.model<IPlayerPowerUp>('PlayerPowerUp', playerPowerUpSchema);
+export const ChatMessage = mongoose.model<IChatMessage>('ChatMessage', chatMessageSchema);
 
 export { mongoose };
 export default mongoose;

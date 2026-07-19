@@ -194,7 +194,7 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response) => 
 router.post('/:id/questions', authenticateToken, async (req: Request, res: Response) => {
   const hostId = (req as any).hostId;
   const quizId = Number(req.params.id);
-  const { question_text, timer_seconds, points, correct_index, answers } = req.body;
+  const { question_text, timer_seconds, points, correct_index, answers, questionType } = req.body;
 
   const quiz = await Quiz.findOne({ id: quizId, hostId });
   if (!quiz) {
@@ -219,6 +219,7 @@ router.post('/:id/questions', authenticateToken, async (req: Request, res: Respo
     pointsMultiplier: 1.0,
     sortOrder,
     correctIndex: correct_index ?? 0,
+    questionType: questionType || 'multiple_choice',
   });
 
   for (let i = 0; i < answers.length; i++) {
@@ -240,7 +241,7 @@ router.put('/:id/questions/:qid', authenticateToken, async (req: Request, res: R
   const hostId = (req as any).hostId;
   const quizId = Number(req.params.id);
   const questionId = Number(req.params.qid);
-  const { question_text, timer_seconds, points, correct_index, answers } = req.body;
+  const { question_text, timer_seconds, points, correct_index, answers, questionType } = req.body;
 
   const quiz = await Quiz.findOne({ id: quizId, hostId });
   if (!quiz) {
@@ -252,6 +253,7 @@ router.put('/:id/questions/:qid', authenticateToken, async (req: Request, res: R
   if (timer_seconds !== undefined) update.timerSeconds = timer_seconds;
   if (points !== undefined) update.points = points;
   if (correct_index !== undefined) update.correctIndex = correct_index;
+  if (questionType !== undefined) update.questionType = questionType;
 
   if (Object.keys(update).length > 0) {
     await Question.updateOne({ id: questionId, quizId }, { $set: update });

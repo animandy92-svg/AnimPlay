@@ -35,6 +35,8 @@ export const api = {
       request('/auth/register', { method: 'POST', body: JSON.stringify({ username, email, password }) }),
     login: (login: string, password: string) =>
       request('/auth/login', { method: 'POST', body: JSON.stringify({ login, password }) }),
+    google: (idToken: string) =>
+      request('/auth/google', { method: 'POST', body: JSON.stringify({ idToken }) }),
     me: () => request('/auth/me'),
   },
   quizzes: {
@@ -48,7 +50,7 @@ export const api = {
     get: (id: number) => request(`/quizzes/${id}`),
     create: (title: string, description?: string) =>
       request('/quizzes', { method: 'POST', body: JSON.stringify({ title, description }) }),
-    update: (id: number, data: { title?: string; description?: string }) =>
+    update: (id: number, data: { title?: string; description?: string; is_favorite?: number; status?: string; is_public?: boolean; folderId?: number | null }) =>
       request(`/quizzes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: number) =>
       request(`/quizzes/${id}`, { method: 'DELETE' }),
@@ -66,8 +68,8 @@ export const api = {
       request(`/quizzes/${quizId}/questions/${questionId}`, { method: 'DELETE' }),
   },
   games: {
-    start: (quizId: number) =>
-      request('/games/start', { method: 'POST', body: JSON.stringify({ quizId }) }),
+    start: (quizId: number, gameMode?: 'classic' | 'team') =>
+      request('/games/start', { method: 'POST', body: JSON.stringify({ quizId, gameMode: gameMode || 'classic' }) }),
     get: (pin: string) => request(`/games/${pin}`),
     getResults: (pin: string) => request(`/games/${pin}/results`),
   },

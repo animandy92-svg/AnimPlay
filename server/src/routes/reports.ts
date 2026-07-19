@@ -19,7 +19,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
       game_pin: g.gamePin,
       started_at: g.startedAt,
       ended_at: g.endedAt,
-      created_at: g.createdAt,
+      created_at: g.created_at,
       quiz_title: quiz?.title,
       player_count: playerCount,
       top_score: top?.score ?? 0,

@@ -3,195 +3,142 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getDb = getDb;
-exports.initializeDb = initializeDb;
-const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
-const path_1 = __importDefault(require("path"));
+exports.connectDb = connectDb;
+exports.disconnectDb = disconnectDb;
+const mongoose_1 = __importDefault(require("mongoose"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
-const DB_PATH = path_1.default.join(__dirname, '..', 'data', 'animplay.db');
-let db;
-function getDb() {
-    if (!db) {
-        db = new better_sqlite3_1.default(DB_PATH);
-        db.pragma('journal_mode = WAL');
-        db.pragma('foreign_keys = ON');
+const models_1 = require("./models");
+async function connectDb() {
+    const uri = process.env.MONGO_URI;
+    if (!uri) {
+        throw new Error('MONGO_URI environment variable is not set');
     }
-    return db;
+    await mongoose_1.default.connect(uri);
+    console.log('Successfully connected to MongoDB!');
+    await seedDiscoverContent();
+    await seedPowerUps();
 }
-function safeAddColumn(db, table, column, definition) {
-    const cols = db.prepare(`PRAGMA table_info(${table})`).all();
-    if (!cols.some(c => c.name === column)) {
-        db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-    }
+async function disconnectDb() {
+    await mongoose_1.default.disconnect();
 }
-function runMigrations(db) {
-    safeAddColumn(db, 'quizzes', 'category', "TEXT DEFAULT 'general'");
-    safeAddColumn(db, 'quizzes', 'play_count', 'INTEGER DEFAULT 0');
-    safeAddColumn(db, 'quizzes', 'status', "TEXT DEFAULT 'published'");
-    safeAddColumn(db, 'quizzes', 'is_favorite', 'BOOLEAN DEFAULT 0');
-    safeAddColumn(db, 'quizzes', 'deleted_at', 'DATETIME');
-    db.exec(`
-    CREATE TABLE IF NOT EXISTS folders (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      host_id     INTEGER NOT NULL REFERENCES hosts(id),
-      name        TEXT NOT NULL,
-      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS quiz_folders (
-      quiz_id     INTEGER NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
-      folder_id   INTEGER NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
-      PRIMARY KEY (quiz_id, folder_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS groups (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      owner_id    INTEGER NOT NULL REFERENCES hosts(id),
-      name        TEXT NOT NULL,
-      description TEXT DEFAULT '',
-      invite_code TEXT UNIQUE NOT NULL,
-      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS group_members (
-      group_id    INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-      host_id     INTEGER NOT NULL REFERENCES hosts(id),
-      role        TEXT DEFAULT 'member',
-      joined_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (group_id, host_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS assignments (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      group_id    INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-      quiz_id     INTEGER NOT NULL REFERENCES quizzes(id),
-      title       TEXT NOT NULL,
-      due_date    DATETIME,
-      created_by  INTEGER NOT NULL REFERENCES hosts(id),
-      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS assignment_completions (
-      assignment_id INTEGER NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
-      host_id       INTEGER NOT NULL REFERENCES hosts(id),
-      completed_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-      score         INTEGER DEFAULT 0,
-      PRIMARY KEY (assignment_id, host_id)
-    );
-  `);
-}
-function seedDiscoverContent(db) {
-    const count = db.prepare('SELECT COUNT(*) as c FROM quizzes WHERE is_public = 1').get();
-    if (count.c > 0)
+const COLORS = ['red', 'blue', 'yellow', 'green'];
+async function seedDiscoverContent() {
+    const publicCount = await models_1.Quiz.countDocuments({ isPublic: true });
+    if (publicCount > 0)
         return;
-    let systemHost = db.prepare("SELECT id FROM hosts WHERE username = 'animplay'").get();
+    let systemHost = await models_1.Host.findOne({ username: 'animplay' });
     if (!systemHost) {
-        const hash = bcrypt_1.default.hashSync('demo1234', 10);
-        const result = db.prepare('INSERT INTO hosts (username, email, password) VALUES (?, ?, ?)').run('animplay', 'demo@animplay.local', hash);
-        systemHost = { id: Number(result.lastInsertRowid) };
+        const hash = await bcrypt_1.default.hash('demo1234', 10);
+        const id = await (0, models_1.nextId)('hosts');
+        systemHost = await models_1.Host.create({
+            id,
+            username: 'animplay',
+            email: 'demo@animplay.local',
+            password: hash,
+        });
     }
     const hostId = systemHost.id;
     const samples = [
-        { title: 'World Capitals', description: 'Test your geography knowledge', category: 'general', questions: [
+        {
+            title: 'World Capitals',
+            description: 'Test your geography knowledge',
+            category: 'general',
+            questions: [
                 { text: 'What is the capital of France?', correct: 0, answers: ['Paris', 'London', 'Berlin', 'Madrid'] },
                 { text: 'What is the capital of Japan?', correct: 0, answers: ['Tokyo', 'Seoul', 'Beijing', 'Bangkok'] },
-            ] },
-        { title: 'Science Trivia', description: 'Fun facts about the natural world', category: 'science', questions: [
+            ],
+        },
+        {
+            title: 'Science Trivia',
+            description: 'Fun facts about the natural world',
+            category: 'science',
+            questions: [
                 { text: 'What planet is known as the Red Planet?', correct: 0, answers: ['Mars', 'Venus', 'Jupiter', 'Saturn'] },
                 { text: 'What gas do plants absorb?', correct: 0, answers: ['Carbon dioxide', 'Oxygen', 'Nitrogen', 'Helium'] },
-            ] },
-        { title: 'Movie Night', description: 'Classic film questions', category: 'trivia', questions: [
+            ],
+        },
+        {
+            title: 'Movie Night',
+            description: 'Classic film questions',
+            category: 'trivia',
+            questions: [
                 { text: 'Who directed Jurassic Park?', correct: 0, answers: ['Steven Spielberg', 'James Cameron', 'George Lucas', 'Peter Jackson'] },
-            ] },
-        { title: 'Spanish Basics', description: 'Learn common Spanish words', category: 'language', questions: [
+            ],
+        },
+        {
+            title: 'Spanish Basics',
+            description: 'Learn common Spanish words',
+            category: 'language',
+            questions: [
                 { text: 'How do you say Hello in Spanish?', correct: 0, answers: ['Hola', 'Adios', 'Gracias', 'Por favor'] },
                 { text: 'How do you say Thank you in Spanish?', correct: 0, answers: ['Gracias', 'Hola', 'Si', 'No'] },
-            ] },
-        { title: 'Sports Legends', description: 'Athletes and records', category: 'sports', questions: [
+            ],
+        },
+        {
+            title: 'Sports Legends',
+            description: 'Athletes and records',
+            category: 'sports',
+            questions: [
                 { text: 'How many players on a soccer team?', correct: 0, answers: ['11', '9', '7', '13'] },
-            ] },
+            ],
+        },
     ];
-    const insertQuiz = db.prepare('INSERT INTO quizzes (host_id, title, description, is_public, category, play_count, status) VALUES (?, ?, ?, 1, ?, ?, ?)');
-    const insertQ = db.prepare('INSERT INTO questions (quiz_id, question_text, timer_seconds, points, sort_order, correct_index) VALUES (?, ?, 20, 1000, ?, ?)');
-    const insertA = db.prepare('INSERT INTO answers (question_id, sort_index, text, color) VALUES (?, ?, ?, ?)');
-    const colors = ['red', 'blue', 'yellow', 'green'];
     for (const sample of samples) {
-        const quizResult = insertQuiz.run(hostId, sample.title, sample.description, sample.category, Math.floor(Math.random() * 5000) + 100, 'published');
-        const quizId = quizResult.lastInsertRowid;
-        sample.questions.forEach((q, idx) => {
-            const qResult = insertQ.run(quizId, q.text, idx, q.correct);
-            q.answers.forEach((a, ai) => {
-                insertA.run(qResult.lastInsertRowid, ai, a, colors[ai]);
-            });
+        const quizId = await (0, models_1.nextId)('quizzes');
+        await models_1.Quiz.create({
+            id: quizId,
+            hostId,
+            title: sample.title,
+            description: sample.description,
+            isPublic: true,
+            category: sample.category,
+            playCount: Math.floor(Math.random() * 5000) + 100,
+            status: 'published',
+            isFavorite: false,
+            folderId: null,
+            deletedAt: null,
         });
+        for (let qi = 0; qi < sample.questions.length; qi++) {
+            const q = sample.questions[qi];
+            const questionId = await (0, models_1.nextId)('questions');
+            await models_1.Question.create({
+                id: questionId,
+                quizId,
+                questionText: q.text,
+                imageUrl: null,
+                timerSeconds: 20,
+                points: 1000,
+                pointsMultiplier: 1.0,
+                sortOrder: qi,
+                correctIndex: q.correct,
+            });
+            for (let ai = 0; ai < q.answers.length; ai++) {
+                const answerId = await (0, models_1.nextId)('answers');
+                await models_1.Answer.create({
+                    id: answerId,
+                    questionId,
+                    sortIndex: ai,
+                    text: q.answers[ai],
+                    color: COLORS[ai] || 'red',
+                });
+            }
+        }
     }
+    console.log('Seeded discover content');
 }
-function initializeDb() {
-    const db = getDb();
-    db.exec(`
-    CREATE TABLE IF NOT EXISTS hosts (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      username    TEXT UNIQUE NOT NULL,
-      email       TEXT UNIQUE NOT NULL,
-      password    TEXT NOT NULL,
-      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS quizzes (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      host_id     INTEGER NOT NULL REFERENCES hosts(id),
-      title       TEXT NOT NULL,
-      description TEXT DEFAULT '',
-      cover_image TEXT,
-      is_public   BOOLEAN DEFAULT 1,
-      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS questions (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      quiz_id         INTEGER NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
-      question_text   TEXT NOT NULL,
-      image_url       TEXT,
-      timer_seconds   INTEGER DEFAULT 20,
-      points          INTEGER DEFAULT 1000,
-      sort_order      INTEGER NOT NULL,
-      correct_index   INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS answers (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
-      sort_index  INTEGER NOT NULL,
-      text        TEXT NOT NULL,
-      color       TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS games (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      game_pin        TEXT UNIQUE NOT NULL,
-      quiz_id         INTEGER NOT NULL REFERENCES quizzes(id),
-      host_id         INTEGER NOT NULL REFERENCES hosts(id),
-      status          TEXT DEFAULT 'lobby',
-      current_question INTEGER DEFAULT 0,
-      started_at      DATETIME,
-      ended_at        DATETIME,
-      created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS game_results (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      game_id     INTEGER NOT NULL REFERENCES games(id),
-      nickname    TEXT NOT NULL,
-      score       INTEGER DEFAULT 0,
-      correct     INTEGER DEFAULT 0,
-      total       INTEGER DEFAULT 0,
-      streak      INTEGER DEFAULT 0,
-      rank        INTEGER
-    );
-  `);
-    runMigrations(db);
-    seedDiscoverContent(db);
-    console.log('Database initialized successfully');
+async function seedPowerUps() {
+    const count = await models_1.PowerUp.countDocuments();
+    if (count > 0)
+        return;
+    const powerUps = [
+        { name: 'double_points', description: 'Double points for next correct answer', icon: '2x', cost: 500 },
+        { name: 'remove_one', description: 'Remove one wrong answer', icon: '-1', cost: 300 },
+        { name: 'time_freeze', description: 'Pause timer for 3 seconds', icon: '⏸', cost: 400 },
+    ];
+    for (const pu of powerUps) {
+        const id = await (0, models_1.nextId)('power_ups');
+        await models_1.PowerUp.create({ id, ...pu });
+    }
+    console.log('Seeded power-ups');
 }
 //# sourceMappingURL=db.js.map
