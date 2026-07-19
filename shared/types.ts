@@ -24,6 +24,7 @@ export interface Question {
   image_url: string | null;
   timer_seconds: number;
   points: number;
+  points_multiplier: number;
   sort_order: number;
   correct_index: number;
 }

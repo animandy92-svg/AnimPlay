@@ -316,7 +316,8 @@ export function setupGameSocket(io: SocketServer) {
       if (isCorrect) {
         const timeTaken = Date.now() - room.questionStartTime;
         const timerMs = currentQuestion.timer_seconds * 1000;
-        pointsEarned = Math.floor(currentQuestion.points * (1 - timeTaken / (2 * timerMs)));
+        const multiplier = (currentQuestion as any).points_multiplier || 1;
+        pointsEarned = Math.floor(currentQuestion.points * (1 - timeTaken / (2 * timerMs)) * multiplier);
         pointsEarned = Math.max(pointsEarned, 500);
         player.streak++;
         pointsEarned += Math.min(player.streak * 50, 500);

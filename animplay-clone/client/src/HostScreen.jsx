@@ -15,6 +15,10 @@ export default function HostScreen() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [answersReceived, setAnswersReceived] = useState(0);
 
+  // Leaderboard state
+  const [leaderboard, setLeaderboard] = useState([]);
+
+
   useEffect(() => {
     const client = io(SERVER_URL);
     setSocket(client);
@@ -53,6 +57,19 @@ export default function HostScreen() {
     client.on('time-up', () => {
       setView('RESULTS');
     });
+
+    // End of game / final podium
+    client.on('game-over', (finalPodium) => {
+      if (Array.isArray(finalPodium)) setLeaderboard(finalPodium);
+      setView('GAME_OVER');
+    });
+
+    // Back-compat: some servers may emit no payload
+    client.on('game-over-no-payload', () => {
+      setView('GAME_OVER');
+    });
+
+
 
     // Fallback: current server emits different events; map them so UI still works
     client.on('player-answered', () => {
@@ -157,6 +174,7 @@ export default function HostScreen() {
 
   // --- VIEW 3: RESULTS (Placeholder) ---
   if (view === 'RESULTS') {
+
     return (
       <div style={styles.container}>
         <h1 style={{ fontSize: '64px' }}>Time's Up!</h1>

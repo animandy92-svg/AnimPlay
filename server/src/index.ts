@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
 import { Server as SocketServer } from 'socket.io';
-import { initializeDb } from './db';
+import { initializeDb, saveDatabase } from './db';
 import authRoutes from './routes/auth';
 import quizRoutes from './routes/quizzes';
 import gameRoutes from './routes/games';
@@ -27,6 +27,15 @@ const io = new SocketServer(httpServer, {
 app.use(cors());
 app.use(express.json());
 
+app.use('/api', (req, res, next) => {
+  if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
+    res.on('finish', () => {
+      if (res.statusCode < 400) saveDatabase();
+    });
+  }
+  next();
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/games', gameRoutes);
@@ -40,9 +49,15 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-initializeDb();
-setupGameSocket(io);
+initializeDb().then(() => {
+  setupGameSocket(io);
 
-httpServer.listen(PORT, () => {
-  console.log(`AnimPlay server running on http://localhost:${PORT}`);
+  setInterval(saveDatabase, 30000);
+
+  process.on('SIGINT', () => { saveDatabase(); process.exit(0); });
+  process.on('SIGTERM', () => { saveDatabase(); process.exit(0); });
+
+  httpServer.listen(PORT, () => {
+    console.log(`AnimPlay server running on http://localhost:${PORT}`);
+  });
 });

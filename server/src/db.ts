@@ -1,35 +1,110 @@
-import Database from 'better-sqlite3';
+import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
 import path from 'path';
+import fs from 'fs';
 import bcrypt from 'bcrypt';
 
 const DB_PATH = path.join(__dirname, '..', 'data', 'animplay.db');
 
-let db: Database.Database;
+let rawDb: SqlJsDatabase;
 
-export function getDb(): Database.Database {
-  if (!db) {
-    db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
-  }
+interface PreparedLike {
+  get(...params: any[]): any;
+  all(...params: any[]): any[];
+  run(...params: any[]): any;
+  bind(...params: any[]): void;
+  step(): boolean;
+  getColumnNames(): string[];
+  get(): any[];
+  free(): void;
+}
+
+interface DbLike {
+  prepare(sql: string): PreparedLike;
+  exec(sql: string): void;
+  pragma(sql: string): void;
+}
+
+function wrapDb(database: SqlJsDatabase): DbLike {
+  return {
+    prepare(sql: string): PreparedLike {
+      const stmt = database.prepare(sql);
+      return {
+        get(...params: any[]) {
+          stmt.bind(params.length === 1 && Array.isArray(params[0]) ? params[0] : params);
+          if (stmt.step()) {
+            const cols = stmt.getColumnNames();
+            const vals = stmt.get();
+            const row: any = {};
+            cols.forEach((c, i) => { row[c] = vals[i]; });
+            stmt.reset();
+            return row;
+          }
+          stmt.reset();
+          return undefined;
+        },
+        all(...params: any[]) {
+          const results: any[] = [];
+          stmt.bind(params.length === 1 && Array.isArray(params[0]) ? params[0] : params);
+          while (stmt.step()) {
+            const cols = stmt.getColumnNames();
+            const vals = stmt.get();
+            const row: any = {};
+            cols.forEach((c, i) => { row[c] = vals[i]; });
+            results.push(row);
+          }
+          stmt.reset();
+          return results;
+        },
+        run(...params: any[]) {
+          stmt.bind(params.length === 1 && Array.isArray(params[0]) ? params[0] : params);
+          stmt.step();
+          const changes = database.getRowsModified();
+          stmt.reset();
+          let lastInsertRowid = 0;
+          const tmp = database.prepare('SELECT last_insert_rowid() as id');
+          if (tmp.step()) lastInsertRowid = tmp.get()[0];
+          tmp.free();
+          return { changes, lastInsertRowid };
+        },
+        bind(...params: any[]) {
+          stmt.bind(params.length === 1 && Array.isArray(params[0]) ? params[0] : params);
+        },
+        step() { return stmt.step(); },
+        getColumnNames() { return stmt.getColumnNames(); },
+        get() { return stmt.get(); },
+        free() { stmt.free(); },
+      };
+    },
+    exec(sql: string) {
+      database.exec(sql);
+    },
+    pragma(pragmaStr: string) {
+      try { database.run(`PRAGMA ${pragmaStr}`); } catch {}
+    },
+  };
+}
+
+let db: DbLike;
+
+export function getDb(): DbLike {
   return db;
 }
 
-function safeAddColumn(db: Database.Database, table: string, column: string, definition: string) {
-  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
-  if (!cols.some(c => c.name === column)) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-  }
+function safeAddColumn(database: SqlJsDatabase, table: string, column: string, definition: string) {
+  const cols = database.exec(`PRAGMA table_info(${table})`);
+  if (cols.length > 0 && cols[0].values.some((row: any[]) => row[1] === column)) return;
+  database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 
-function runMigrations(db: Database.Database) {
-  safeAddColumn(db, 'quizzes', 'category', "TEXT DEFAULT 'general'");
-  safeAddColumn(db, 'quizzes', 'play_count', 'INTEGER DEFAULT 0');
-  safeAddColumn(db, 'quizzes', 'status', "TEXT DEFAULT 'published'");
-  safeAddColumn(db, 'quizzes', 'is_favorite', 'BOOLEAN DEFAULT 0');
-  safeAddColumn(db, 'quizzes', 'deleted_at', 'DATETIME');
+function runMigrations(database: SqlJsDatabase) {
+  safeAddColumn(database, 'quizzes', 'category', "TEXT DEFAULT 'general'");
+  safeAddColumn(database, 'quizzes', 'play_count', 'INTEGER DEFAULT 0');
+  safeAddColumn(database, 'quizzes', 'status', "TEXT DEFAULT 'published'");
+  safeAddColumn(database, 'quizzes', 'is_favorite', 'BOOLEAN DEFAULT 0');
+  safeAddColumn(database, 'quizzes', 'deleted_at', 'DATETIME');
+  safeAddColumn(database, 'questions', 'points_multiplier', 'REAL DEFAULT 1.0');
 
-  db.exec(`
+  database.exec(`
     CREATE TABLE IF NOT EXISTS folders (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       host_id     INTEGER NOT NULL REFERENCES hosts(id),
@@ -80,20 +155,23 @@ function runMigrations(db: Database.Database) {
   `);
 }
 
-function seedDiscoverContent(db: Database.Database) {
-  const count = db.prepare('SELECT COUNT(*) as c FROM quizzes WHERE is_public = 1').get() as { c: number };
-  if (count.c > 0) return;
+function seedDiscoverContent(database: SqlJsDatabase) {
+  const countResult = database.exec('SELECT COUNT(*) as c FROM quizzes WHERE is_public = 1');
+  if (countResult.length > 0 && countResult[0].values[0][0] > 0) return;
 
-  let systemHost = db.prepare("SELECT id FROM hosts WHERE username = 'animplay'").get() as { id: number } | undefined;
-  if (!systemHost) {
+  let systemHostId: number;
+  const hostResult = database.exec("SELECT id FROM hosts WHERE username = 'animplay'");
+  if (hostResult.length > 0 && hostResult[0].values.length > 0) {
+    systemHostId = hostResult[0].values[0][0] as number;
+  } else {
     const hash = bcrypt.hashSync('demo1234', 10);
-    const result = db.prepare('INSERT INTO hosts (username, email, password) VALUES (?, ?, ?)').run(
-      'animplay', 'demo@animplay.local', hash
-    );
-    systemHost = { id: Number(result.lastInsertRowid) };
+    database.run('INSERT INTO hosts (username, email, password) VALUES (?, ?, ?)',
+      ['animplay', 'demo@animplay.local', hash]);
+    const idResult = database.exec('SELECT last_insert_rowid()');
+    systemHostId = idResult[0].values[0][0] as number;
   }
 
-  const hostId = systemHost.id;
+  const hostId = systemHostId;
   const samples = [
     { title: 'World Capitals', description: 'Test your geography knowledge', category: 'general', questions: [
       { text: 'What is the capital of France?', correct: 0, answers: ['Paris', 'London', 'Berlin', 'Madrid'] },
@@ -115,31 +193,48 @@ function seedDiscoverContent(db: Database.Database) {
     ]},
   ];
 
-  const insertQuiz = db.prepare(
-    'INSERT INTO quizzes (host_id, title, description, is_public, category, play_count, status) VALUES (?, ?, ?, 1, ?, ?, ?)'
-  );
-  const insertQ = db.prepare(
-    'INSERT INTO questions (quiz_id, question_text, timer_seconds, points, sort_order, correct_index) VALUES (?, ?, 20, 1000, ?, ?)'
-  );
-  const insertA = db.prepare('INSERT INTO answers (question_id, sort_index, text, color) VALUES (?, ?, ?, ?)');
   const colors = ['red', 'blue', 'yellow', 'green'];
 
   for (const sample of samples) {
-    const quizResult = insertQuiz.run(hostId, sample.title, sample.description, sample.category, Math.floor(Math.random() * 5000) + 100, 'published');
-    const quizId = quizResult.lastInsertRowid;
+    database.run(
+      'INSERT INTO quizzes (host_id, title, description, is_public, category, play_count, status) VALUES (?, ?, ?, 1, ?, ?, ?)',
+      [hostId, sample.title, sample.description, sample.category, Math.floor(Math.random() * 5000) + 100, 'published']
+    );
+    const quizId = (database.exec('SELECT last_insert_rowid()'))[0].values[0][0] as number;
+
     sample.questions.forEach((q, idx) => {
-      const qResult = insertQ.run(quizId, q.text, idx, q.correct);
+      database.run(
+        'INSERT INTO questions (quiz_id, question_text, timer_seconds, points, points_multiplier, sort_order, correct_index) VALUES (?, ?, 20, 1000, 1.0, ?, ?)',
+        [quizId, q.text, idx, q.correct]
+      );
+      const qId = (database.exec('SELECT last_insert_rowid()'))[0].values[0][0] as number;
       q.answers.forEach((a, ai) => {
-        insertA.run(qResult.lastInsertRowid, ai, a, colors[ai]);
+        database.run('INSERT INTO answers (question_id, sort_index, text, color) VALUES (?, ?, ?, ?)',
+          [qId, ai, a, colors[ai]]);
       });
     });
   }
 }
 
-export function initializeDb(): void {
-  const db = getDb();
+export async function initializeDb(): Promise<void> {
+  const SQL = await initSqlJs();
 
-  db.exec(`
+  const dataDir = path.join(__dirname, '..', 'data');
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+
+  if (fs.existsSync(DB_PATH)) {
+    const fileBuffer = fs.readFileSync(DB_PATH);
+    rawDb = new SQL.Database(fileBuffer);
+  } else {
+    rawDb = new SQL.Database();
+  }
+
+  rawDb.run('PRAGMA journal_mode = WAL');
+  rawDb.run('PRAGMA foreign_keys = ON');
+
+  rawDb.exec(`
     CREATE TABLE IF NOT EXISTS hosts (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       username    TEXT UNIQUE NOT NULL,
@@ -164,8 +259,9 @@ export function initializeDb(): void {
       quiz_id         INTEGER NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
       question_text   TEXT NOT NULL,
       image_url       TEXT,
-      timer_seconds   INTEGER DEFAULT 20,
+      timer_seconds   INTEGER DEFAULT 20 CHECK(timer_seconds IN (10, 20, 30, 60)),
       points          INTEGER DEFAULT 1000,
+      points_multiplier REAL DEFAULT 1.0,
       sort_order      INTEGER NOT NULL,
       correct_index   INTEGER NOT NULL
     );
@@ -202,7 +298,16 @@ export function initializeDb(): void {
     );
   `);
 
-  runMigrations(db);
-  seedDiscoverContent(db);
+  runMigrations(rawDb);
+  seedDiscoverContent(rawDb);
+
+  db = wrapDb(rawDb);
   console.log('Database initialized successfully');
+}
+
+export function saveDatabase(): void {
+  if (!rawDb) return;
+  const data = rawDb.export();
+  const buffer = Buffer.from(data);
+  fs.writeFileSync(DB_PATH, buffer);
 }
