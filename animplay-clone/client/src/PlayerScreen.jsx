@@ -9,6 +9,8 @@ export default function PlayerScreen() {
   const [pin, setPin] = useState('');
   const [nickname, setNickname] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [answerCount, setAnswerCount] = useState(0);
+  const [activeAnswer, setActiveAnswer] = useState(null);
 
   useEffect(() => {
     socket.on('join-success', () => {
@@ -20,9 +22,15 @@ export default function PlayerScreen() {
       setErrorMessage(message);
     });
 
+    socket.on('player-question-start', (data) => {
+      setAnswerCount(data.answerCount);
+      setView('QUESTION');
+    });
+
     return () => {
       socket.off('join-success');
       socket.off('join-error');
+      socket.off('player-question-start');
     };
   }, []);
 
@@ -36,12 +44,59 @@ export default function PlayerScreen() {
     socket.emit('player-join', { pin, nickname });
   };
 
+  const submitAnswer = (index) => {
+    // We send the index (0, 1, 2, or 3) back to the server
+    socket.emit('submit-answer', { pin, answerIndex: index });
+
+    // Immediately put the player back into a waiting state so they can't double-click
+    setView('WAITING');
+  };
+
   if (view === 'WAITING') {
     return (
       <div style={styles.container}>
         <div style={styles.waitingBox}>
           <h2>You're in!</h2>
           <p>See your nickname on the screen.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'QUESTION') {
+    const buttonData = [
+      { color: '#e21b3c', shape: 'polygon', points: '50,15 100,100 0,100' }, // Red Triangle
+      { color: '#1368ce', shape: 'polygon', points: '50,0 100,50 50,100 0,50' }, // Blue Diamond
+      { color: '#d89e00', shape: 'circle', cx: '50', cy: '50', r: '40' }, // Yellow Circle
+      { color: '#26890c', shape: 'rect', x: '15', y: '15', width: '70', height: '70' }, // Green Square
+    ];
+
+    return (
+      <div style={styles.container}>
+        <div style={styles.padGrid}>
+          {buttonData.slice(0, answerCount).map((btn, index) => (
+            <button
+              key={index}
+              style={{
+                ...styles.answerBtn,
+                backgroundColor: btn.color,
+                transform: activeAnswer === index ? 'translateY(2px)' : 'translateY(0)',
+                boxShadow: activeAnswer === index ? '0px 2px 0px rgba(0,0,0,0.2)' : styles.answerBtn.boxShadow,
+              }}
+              onMouseDown={() => setActiveAnswer(index)}
+              onMouseUp={() => setActiveAnswer(null)}
+              onMouseLeave={() => setActiveAnswer(null)}
+              onTouchStart={() => setActiveAnswer(index)}
+              onTouchEnd={() => setActiveAnswer(null)}
+              onClick={() => submitAnswer(index)}
+            >
+              <svg viewBox="0 0 100 100" width="50%" height="50%" fill="white">
+                {btn.shape === 'polygon' && <polygon points={btn.points} />}
+                {btn.shape === 'circle' && <circle cx={btn.cx} cy={btn.cy} r={btn.r} />}
+                {btn.shape === 'rect' && <rect x={btn.x} y={btn.y} width={btn.width} height={btn.height} />}
+              </svg>
+            </button>
+          ))}
         </div>
       </div>
     );
@@ -135,5 +190,39 @@ const styles = {
     color: '#333',
     fontSize: '24px',
     fontWeight: 'bold',
+  },
+  questionBox: {
+    backgroundColor: '#fff',
+    padding: '40px',
+    borderRadius: '12px',
+    boxShadow: '0px 8px 20px rgba(0,0,0,0.12)',
+    textAlign: 'center',
+    maxWidth: 480,
+    width: '100%',
+  },
+  padGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr', // 2 columns
+    gridTemplateRows: '1fr 1fr',    // 2 rows
+    gap: '10px',
+    width: '100vw',
+    height: '100vh',
+    padding: '10px',
+    boxSizing: 'border-box',
+    backgroundColor: '#f2f2f2',
+  },
+  answerBtn: {
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    fontSize: '32px',
+    fontWeight: 'bold',
+    backgroundColor: '#fff',
+    color: '#46178f',
+    boxShadow: '0px 4px 0px rgba(0,0,0,0.2)',
+    transition: 'transform 0.1s, box-shadow 0.1s',
   },
 };

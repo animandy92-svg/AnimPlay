@@ -17,6 +17,19 @@ const io = new Server(server, {
 // This Map will store all live games in the server's memory
 const activeGames = new Map();
 
+const dummyQuiz = [
+  {
+    text: 'What is the capital of Japan?',
+    timeLimit: 20,
+    answers: [
+      { text: 'Kyoto', isCorrect: false },
+      { text: 'Osaka', isCorrect: false },
+      { text: 'Tokyo', isCorrect: true },
+      { text: 'Seoul', isCorrect: false },
+    ],
+  },
+];
+
 // Helper function to generate a 6-digit PIN
 function generateGamePin() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -29,6 +42,24 @@ app.get('/', (req, res) => {
 const getPlayersForGame = (pin) => {
   const game = activeGames.get(pin);
   return game ? game.players : [];
+};
+
+const startTimer = (pin, game, timeLimit) => {
+  if (game.questionTimer) {
+    clearTimeout(game.questionTimer);
+  }
+
+  const endsAt = Date.now() + timeLimit * 1000;
+  io.to(pin).emit('timer-start', {
+    timeLimit,
+    endsAt,
+  });
+
+  game.questionTimer = setTimeout(() => {
+    io.to(pin).emit('timer-ended');
+    io.to(game.hostSocketId).emit('timer-ended');
+    console.log(`Timer ended for game ${pin}`);
+  }, timeLimit * 1000);
 };
 
 const removePlayerFromGame = (socket) => {
@@ -112,17 +143,58 @@ io.on('connection', (socket) => {
     console.log(`${nickname} joined game ${pin}`);
   });
 
-  socket.on('leave-game', () => {
-    removePlayerFromGame(socket);
-  });
+    // 3. HOST STARTS THE GAME
+    socket.on('start-game', (pin) => {
+      const game = activeGames.get(pin);
 
-  socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
-    removePlayerFromGame(socket);
-  });
-});
+      // Verify the game exists and the requester is actually the host
+      if (game && game.hostSocketId === socket.id) {
+        game.gameState = 'QUESTION';
+        game.currentQuestionIndex = 0;
 
-const PORT = process.env.PORT || 3002;
-server.listen(PORT, () => {
-  console.log(`AnimPlay server is running on port ${PORT}`);
-});
+        const currentQuestion = dummyQuiz[game.currentQuestionIndex];
+
+        // Send the FULL question data to the Host's screen
+        io.to(game.hostSocketId).emit('host-question-start', currentQuestion);
+
+        // Send ONLY the number of answers to the Player's screen (the remote control)
+        socket.to(pin).emit('player-question-start', {
+          answerCount: currentQuestion.answers.length,
+        });
+
+        // NEW: Start the server-side countdown!
+        startTimer(pin, game, currentQuestion.timeLimit);
+
+        console.log(`Game ${pin} has started! Timer set for ${currentQuestion.timeLimit}s.`);
+      }
+    });
+
+    socket.on('submit-answer', (data) => {
+      const { pin, answerIndex } = data;
+      const game = activeGames.get(pin);
+
+      if (!game) {
+        socket.emit('answer-error', 'Game not found.');
+        return;
+      }
+
+      const player = game.players.find((p) => p.socketId === socket.id);
+      if (!player) {
+        socket.emit('answer-error', 'Player not found in this game.');
+        return;
+      }
+
+      // In this dummy flow, we just accept the answer and notify the host.
+      io.to(game.hostSocketId).emit('player-answered', {
+        nickname: player.nickname,
+        answerIndex,
+      });
+
+      socket.emit('answer-confirmed', {
+        accepted: true,
+        answerIndex,
+      });
+
+      console.log(`${player.nickname} answered ${answerIndex} in game ${pin}`);
+    });
+

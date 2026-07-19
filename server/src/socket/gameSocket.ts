@@ -1,8 +1,7 @@
 import { Server as SocketServer, Socket } from 'socket.io';
 import { randomUUID } from 'crypto';
 import { getDb } from '../db';
-import { calculatePoints } from '../utils/scoring';
-import type { GameRoom, Player, PlayerAnswer, LeaderboardEntry, QuestionWithOptions, QuizDetail } from '../../../shared/types';
+import type { GameRoom, Player, LeaderboardEntry, QuestionWithOptions, QuizDetail } from '../../../shared/types';
 
 const badWordsList = ['badword1', 'badword2', 'trollname']; // Extend this list
 
@@ -253,6 +252,7 @@ export function setupGameSocket(io: SocketServer) {
       if (!room || room.hostSocketId !== socket.id) return;
 
       room.status = 'active';
+      room.currentQuestionIndex = 0;
       room.startedAt = new Date();
 
       const db = getDb();
@@ -263,7 +263,33 @@ export function setupGameSocket(io: SocketServer) {
         totalQuestions: room.quiz.questions.length,
       });
 
-      sendQuestion(room, io);
+      const question = room.quiz.questions[room.currentQuestionIndex];
+      if (!question) return;
+
+      io.to(room.hostSocketId).emit('host-question-start', {
+        questionId: question.id,
+        questionText: question.question_text,
+        answers: question.answers.map(a => ({ text: a.text, color: a.color })),
+        timer: question.timer_seconds,
+        questionIndex: room.currentQuestionIndex,
+        totalQuestions: room.quiz.questions.length,
+      });
+
+      for (const player of room.players.values()) {
+        if (player.socketId) {
+          io.to(player.socketId).emit('player-question-start', {
+            questionId: question.id,
+            answerCount: question.answers.length,
+            timer: question.timer_seconds,
+            questionIndex: room.currentQuestionIndex,
+            totalQuestions: room.quiz.questions.length,
+          });
+        }
+      }
+
+      startTimer(room, io, question.timer_seconds);
+
+      console.log(`Game ${gamePin} started. Timer set for ${question.timer_seconds}s.`);
     });
 
     socket.on('answer-submitted', (data: {
@@ -279,45 +305,26 @@ export function setupGameSocket(io: SocketServer) {
       if (!room || room.status !== 'active') return;
 
       const player = Array.from(room.players.values()).find(p => p.socketId === socket.id);
-      if (!player) return;
-
-      const alreadyAnswered = player.answers.some(a => a.questionId === data.questionId);
-      if (alreadyAnswered) {
-        socket.emit('answer-confirmed', { accepted: false });
-        return;
-      }
+      if (!player || player.hasAnswered) return;
 
       const currentQuestion = room.quiz.questions[room.currentQuestionIndex];
       if (!currentQuestion || currentQuestion.id !== data.questionId) return;
 
       const isCorrect = data.answerIndex === currentQuestion.correct_index;
       let pointsEarned = 0;
-      let newStreak = player.streak;
 
       if (isCorrect) {
-        newStreak = player.streak + 1;
-        const scoring = calculatePoints(
-          currentQuestion.timer_seconds,
-          data.responseTimeMs,
-          currentQuestion.points,
-          player.streak
-        );
-        pointsEarned = scoring.points;
+        const timeTaken = Date.now() - room.questionStartTime;
+        const timerMs = currentQuestion.timer_seconds * 1000;
+        pointsEarned = Math.floor(currentQuestion.points * (1 - timeTaken / (2 * timerMs)));
+        pointsEarned = Math.max(pointsEarned, 500);
+        player.streak++;
+        pointsEarned += Math.min(player.streak * 50, 500);
       } else {
-        newStreak = 0;
+        player.streak = 0;
       }
 
-      const answer: PlayerAnswer = {
-        questionId: data.questionId,
-        answerIndex: data.answerIndex,
-        responseTimeMs: data.responseTimeMs,
-        isCorrect,
-        pointsEarned,
-      };
-
-      player.answers.push(answer);
       player.score += pointsEarned;
-      player.streak = newStreak;
       player.hasAnswered = true;
       if (isCorrect) player.correctCount++;
 
@@ -329,9 +336,14 @@ export function setupGameSocket(io: SocketServer) {
         totalCount: room.players.size,
       });
 
-      console.log(`Player "${player.nickname}" answered Q${data.questionId}: ${isCorrect ? 'CORRECT' : 'WRONG'} (+${pointsEarned}pts)`);
+      console.log(`[Game ${gamePin}] ${player.nickname}: ${isCorrect ? 'CORRECT' : 'WRONG'} (+${pointsEarned}pts) | ${answeredCount}/${room.players.size} answered`);
 
-      checkIfAllAnswered(room, io);
+      const allAnswered = Array.from(room.players.values()).every(p => p.hasAnswered);
+      if (allAnswered) {
+        clearQuestionTimers(room);
+        io.to(gamePin).emit('time-up', { reason: 'all-answered' });
+        setTimeout(() => showQuestionResults(room, io), 500);
+      }
     });
 
     socket.on('host-next-question', (data: { gameId: number }) => {
@@ -410,6 +422,29 @@ export function setupGameSocket(io: SocketServer) {
   });
 }
 
+function startTimer(room: ServerGameRoom, io: SocketServer, timeLimit: number) {
+  let timeLeft = timeLimit;
+
+  room.questionStartTime = Date.now();
+
+  if (room.questionTimerInterval) {
+    clearInterval(room.questionTimerInterval);
+  }
+
+  room.questionTimerInterval = setInterval(() => {
+    timeLeft--;
+
+    io.to(room.gamePin).emit('timer-tick', { timeLeft });
+
+    if (timeLeft <= 0) {
+      clearInterval(room.questionTimerInterval);
+      room.questionTimerInterval = undefined;
+      io.to(room.gamePin).emit('time-up', { reason: 'timer-expired' });
+      showQuestionResults(room, io);
+    }
+  }, 1000);
+}
+
 function sendQuestion(room: ServerGameRoom, io: SocketServer) {
   const question = room.quiz.questions[room.currentQuestionIndex];
   if (!question) return;
@@ -446,35 +481,15 @@ function sendQuestion(room: ServerGameRoom, io: SocketServer) {
     }
   }
 
-  const timerMs = question.timer_seconds * 1000;
-
-  room.questionTimerInterval = setInterval(() => {
-    const elapsed = Date.now() - startsAt;
-    const timeLeft = Math.max(0, Math.ceil((timerMs - elapsed) / 1000));
-    io.to(room.gamePin).emit('timer-tick', { timeLeft });
-
-    if (timeLeft <= 0) {
-      clearQuestionTimers(room);
-      io.to(room.gamePin).emit('time-up');
-      showQuestionResults(room, io);
-    }
+  setTimeout(() => {
+    startTimer(room, io, question.timer_seconds);
   }, 1000);
-
-  room.questionTimeout = setTimeout(() => {
-    clearQuestionTimers(room);
-    io.to(room.gamePin).emit('time-up');
-    showQuestionResults(room, io);
-  }, timerMs + 1500);
 }
 
 function clearQuestionTimers(room: ServerGameRoom) {
   if (room.questionTimerInterval) {
     clearInterval(room.questionTimerInterval);
     room.questionTimerInterval = undefined;
-  }
-  if (room.questionTimeout) {
-    clearTimeout(room.questionTimeout);
-    room.questionTimeout = undefined;
   }
 }
 
@@ -486,7 +501,7 @@ function checkIfAllAnswered(room: ServerGameRoom, io: SocketServer) {
 
   clearQuestionTimers(room);
 
-  io.to(room.gamePin).emit('time-up');
+  io.to(room.gamePin).emit('time-up', { reason: 'all-answered' });
 
   setTimeout(() => {
     showQuestionResults(room, io);

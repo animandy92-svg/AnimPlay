@@ -40,23 +40,10 @@ export default function HostGame() {
       setPhase('question');
       setTotalAnswered(0);
       setTimeLeft(data.timer);
+    });
 
-      const timerMs = data.timer * 1000;
-      const elapsed = Date.now() - data.startsAt;
-      const remaining = Math.max(0, timerMs - elapsed);
-      setTimeLeft(remaining / 1000);
-
-      const interval = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 0.1) {
-            clearInterval(interval);
-            return 0;
-          }
-          return prev - 0.1;
-        });
-      }, 100);
-
-      return () => clearInterval(interval);
+    const unsubTimerTick = on('timer-tick', (data: { timeLeft: number }) => {
+      setTimeLeft(data.timeLeft);
     });
 
     const unsubAnswerReceived = on('answer-received', (data: { answeredCount: number; totalCount: number }) => {
@@ -89,6 +76,7 @@ export default function HostGame() {
 
     return () => {
       unsubQuestion();
+      unsubTimerTick();
       unsubAnswerReceived();
       unsubPlayerJoined();
       unsubPlayerLeft();

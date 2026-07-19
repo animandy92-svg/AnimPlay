@@ -79,7 +79,6 @@ export interface GameRoom {
   quiz: QuizDetail;
   startedAt: Date;
   questionStartTime?: number;
-  questionTimeout?: ReturnType<typeof setTimeout>;
   questionTimerInterval?: ReturnType<typeof setInterval>;
 }
 
