@@ -12,8 +12,8 @@ services:
       - key: PORT
         value: 3001
       - key: MONGO_URI
-        value: mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/animplay_db?retryWrites=true&w=majority
+        value: mongodb+srv://animandy92_db_user:AnimAndy92%40gmail.com@animplaycluster.5ts9kam.mongodb.net/animplay_db?retryWrites=true&w=majority
       - key: JWT_SECRET
-        value: change-me-to-a-long-random-string-in-production
+        value: bqHgWikBaI6FjVJ7unfwtM894xDov1PG
       - key: GOOGLE_CLIENT_ID
-        value: your-google-client-id.apps.googleusercontent.com
+        value: 17856885980-kggou5pigsibvspprc2aecc0l6an771e.apps.googleusercontent.com
