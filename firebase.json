@@ -9,7 +9,7 @@
     "rewrites": [
       {
         "source": "/api/**",
-        "destination": "https://animplay-backend.onrender.com/api/$1"
+        "destination": "https://animplay-k69u.onrender.com/api/$1"
       },
       {
         "source": "**",

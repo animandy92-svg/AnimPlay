@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.connectDb = connectDb;
 exports.disconnectDb = disconnectDb;
 const mongoose_1 = __importDefault(require("mongoose"));
-const bcrypt_1 = __importDefault(require("bcrypt"));
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const models_1 = require("./models");
 async function connectDb() {
     const uri = process.env.MONGO_URI;
@@ -28,7 +28,7 @@ async function seedDiscoverContent() {
         return;
     let systemHost = await models_1.Host.findOne({ username: 'animplay' });
     if (!systemHost) {
-        const hash = await bcrypt_1.default.hash('demo1234', 10);
+        const hash = await bcryptjs_1.default.hash('demo1234', 10);
         const id = await (0, models_1.nextId)('hosts');
         systemHost = await models_1.Host.create({
             id,

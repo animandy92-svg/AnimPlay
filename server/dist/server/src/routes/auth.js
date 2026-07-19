@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authenticateToken = authenticateToken;
 const express_1 = require("express");
-const bcrypt_1 = __importDefault(require("bcrypt"));
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const google_auth_library_1 = require("google-auth-library");
 const models_1 = require("../models");
@@ -28,7 +28,7 @@ router.post('/register', async (req, res) => {
         if (existing) {
             return res.status(409).json({ error: 'Username or email already exists' });
         }
-        const hashedPassword = await bcrypt_1.default.hash(password, 10);
+        const hashedPassword = await bcryptjs_1.default.hash(password, 10);
         const id = await (0, models_2.nextId)('hosts');
         const host = await models_1.Host.create({ id, username, email, password: hashedPassword });
         const token = jsonwebtoken_1.default.sign({ id: host.id, username }, JWT_SECRET || FALLBACK_JWT_SECRET, { expiresIn: '7d' });
@@ -45,7 +45,7 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ error: 'Login and password are required' });
         }
         const host = await models_1.Host.findOne({ $or: [{ username: login }, { email: login }] });
-        if (!host || !host.password || !(await bcrypt_1.default.compare(password, host.password))) {
+        if (!host || !host.password || !(await bcryptjs_1.default.compare(password, host.password))) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         const token = jsonwebtoken_1.default.sign({ id: host.id, username: host.username }, JWT_SECRET || FALLBACK_JWT_SECRET, { expiresIn: '7d' });
