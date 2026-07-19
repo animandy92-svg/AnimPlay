@@ -1,93 +1,109 @@
 import { Router, Request, Response } from 'express';
-import { getDb } from '../db';
+import {
+  Assignment,
+  AssignmentCompletion,
+  Group,
+  GroupMember,
+  Quiz,
+  nextId,
+} from '../models';
 import { authenticateToken } from './auth';
 
 const router = Router();
 
-router.get('/assignments', authenticateToken, (req: Request, res: Response) => {
-  const db = getDb();
+router.get('/assignments', authenticateToken, async (req: Request, res: Response) => {
   const hostId = (req as any).hostId;
   const tab = (req.query.tab as string) || 'todo';
+  const now = new Date();
 
-  const now = new Date().toISOString();
+  const memberships = await GroupMember.find({ hostId }).lean();
+  const groupIds = memberships.map((m) => m.groupId);
 
-  let query = `
-    SELECT a.*, q.title as quiz_title, g.name as group_name,
-           ac.completed_at IS NOT NULL as is_completed
-    FROM assignments a
-    JOIN quizzes q ON q.id = a.quiz_id
-    JOIN groups g ON g.id = a.group_id
-    JOIN group_members gm ON gm.group_id = g.id AND gm.host_id = ?
-    LEFT JOIN assignment_completions ac ON ac.assignment_id = a.id AND ac.host_id = ?
-    WHERE 1=1
-  `;
+  const assignments = await Assignment.find({ groupId: { $in: groupIds } }).lean();
 
-  if (tab === 'completed') {
-    query += ' AND ac.completed_at IS NOT NULL';
-  } else if (tab === 'expired') {
-    query += ' AND ac.completed_at IS NULL AND a.due_date IS NOT NULL AND a.due_date < ?';
-  } else {
-    query += ' AND ac.completed_at IS NULL AND (a.due_date IS NULL OR a.due_date >= ?)';
+  const result = [];
+  for (const a of assignments) {
+    const quiz = await Quiz.findOne({ id: a.quizId }).lean();
+    const group = await Group.findOne({ id: a.groupId }).lean();
+    const completion = await AssignmentCompletion.findOne({ assignmentId: a.id, hostId }).lean();
+    const isCompleted = !!completion;
+
+    if (tab === 'completed' && !isCompleted) continue;
+    if (tab === 'todo' && (isCompleted || (a.dueDate && a.dueDate < now))) continue;
+    if (tab === 'expired' && (isCompleted || !(a.dueDate && a.dueDate < now))) continue;
+
+    result.push({
+      ...a,
+      quiz_title: quiz?.title,
+      group_name: group?.name,
+      is_completed: isCompleted,
+    });
   }
 
-  query += ' ORDER BY a.due_date ASC NULLS LAST, a.created_at DESC';
-
-  const params = tab === 'expired'
-    ? [hostId, hostId, now]
-    : tab === 'todo'
-      ? [hostId, hostId, now]
-      : [hostId, hostId];
-
-  const assignments = db.prepare(query).all(...params);
-  res.json({ assignments });
+  res.json({ assignments: result });
 });
 
-router.post('/assignments/:id/complete', authenticateToken, (req: Request, res: Response) => {
-  const db = getDb();
+router.post('/assignments/:id/complete', authenticateToken, async (req: Request, res: Response) => {
   const hostId = (req as any).hostId;
-  const assignmentId = req.params.id;
+  const assignmentId = Number(req.params.id);
   const { score = 0 } = req.body;
 
-  const assignment = db.prepare(`
-    SELECT a.* FROM assignments a
-    JOIN group_members gm ON gm.group_id = a.group_id
-    WHERE a.id = ? AND gm.host_id = ?
-  `).get(assignmentId, hostId);
-
+  const assignment = await Assignment.findOne({ id: assignmentId });
   if (!assignment) {
     return res.status(404).json({ error: 'Assignment not found' });
   }
 
-  db.prepare(`
-    INSERT INTO assignment_completions (assignment_id, host_id, score)
-    VALUES (?, ?, ?)
-    ON CONFLICT(assignment_id, host_id) DO UPDATE SET completed_at = CURRENT_TIMESTAMP, score = ?
-  `).run(assignmentId, hostId, score, score);
+  const membership = await GroupMember.findOne({ groupId: assignment.groupId, hostId });
+  if (!membership) {
+    return res.status(404).json({ error: 'Assignment not found' });
+  }
+
+  const existing = await AssignmentCompletion.findOne({ assignmentId, hostId });
+  if (existing) {
+    await AssignmentCompletion.updateOne(
+      { assignmentId, hostId },
+      { $set: { completedAt: new Date(), score } }
+    );
+  } else {
+    const id = await nextId('assignment_completions');
+    await AssignmentCompletion.create({
+      id,
+      assignmentId,
+      hostId,
+      completedAt: new Date(),
+      score,
+    });
+  }
 
   res.json({ success: true });
 });
 
-router.post('/groups/:groupId/assignments', authenticateToken, (req: Request, res: Response) => {
-  const db = getDb();
+router.post('/groups/:groupId/assignments', authenticateToken, async (req: Request, res: Response) => {
   const hostId = (req as any).hostId;
-  const groupId = req.params.groupId;
+  const groupId = Number(req.params.groupId);
   const { quizId, title, dueDate } = req.body;
 
-  const group = db.prepare('SELECT * FROM groups WHERE id = ? AND owner_id = ?').get(groupId, hostId);
+  const group = await Group.findOne({ id: groupId, ownerId: hostId });
   if (!group) {
     return res.status(403).json({ error: 'Only group owners can assign quizzes' });
   }
 
-  const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND host_id = ?').get(quizId, hostId);
+  const quiz = await Quiz.findOne({ id: Number(quizId), hostId });
   if (!quiz) {
     return res.status(404).json({ error: 'Quiz not found' });
   }
 
-  const result = db.prepare(
-    'INSERT INTO assignments (group_id, quiz_id, title, due_date, created_by) VALUES (?, ?, ?, ?, ?)'
-  ).run(groupId, quizId, title || (quiz as any).title, dueDate || null, hostId);
+  const id = await nextId('assignments');
+  const assignment = await Assignment.create({
+    id,
+    groupId,
+    quizId: Number(quizId),
+    title: title || quiz.title,
+    dueDate: dueDate ? new Date(dueDate) : null,
+    createdBy: hostId,
+  });
 
-  res.json({ assignment: { id: result.lastInsertRowid } });
+  res.json({ assignment: { id } });
 });
 
 export default router;

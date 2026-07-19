@@ -1,8 +1,9 @@
 import express from 'express';
 import cors from 'cors';
+import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server as SocketServer } from 'socket.io';
-import { initializeDb, saveDatabase } from './db';
+import { connectDb, disconnectDb } from './db';
 import authRoutes from './routes/auth';
 import quizRoutes from './routes/quizzes';
 import gameRoutes from './routes/games';
@@ -12,6 +13,8 @@ import groupRoutes from './routes/groups';
 import learningRoutes from './routes/learning';
 import folderRoutes from './routes/folders';
 import { setupGameSocket } from './socket/gameSocket';
+
+dotenv.config();
 
 const PORT = process.env.PORT || 3001;
 const app = express();
@@ -27,15 +30,6 @@ const io = new SocketServer(httpServer, {
 app.use(cors());
 app.use(express.json());
 
-app.use('/api', (req, res, next) => {
-  if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
-    res.on('finish', () => {
-      if (res.statusCode < 400) saveDatabase();
-    });
-  }
-  next();
-});
-
 app.use('/api/auth', authRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/games', gameRoutes);
@@ -49,13 +43,11 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-initializeDb().then(() => {
+connectDb().then(() => {
   setupGameSocket(io);
 
-  setInterval(saveDatabase, 30000);
-
-  process.on('SIGINT', () => { saveDatabase(); process.exit(0); });
-  process.on('SIGTERM', () => { saveDatabase(); process.exit(0); });
+  process.on('SIGINT', () => { disconnectDb().then(() => process.exit(0)); });
+  process.on('SIGTERM', () => { disconnectDb().then(() => process.exit(0)); });
 
   httpServer.listen(PORT, () => {
     console.log(`AnimPlay server running on http://localhost:${PORT}`);

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { randomBytes } from 'crypto';
-import { getDb } from '../db';
+import { Group, GroupMember, nextId } from '../models';
 import { authenticateToken } from './auth';
 
 const router = Router();
@@ -9,35 +9,35 @@ function generateInviteCode(): string {
   return randomBytes(4).toString('hex').toUpperCase();
 }
 
-router.get('/', authenticateToken, (req: Request, res: Response) => {
-  const db = getDb();
+router.get('/', authenticateToken, async (req: Request, res: Response) => {
   const hostId = (req as any).hostId;
   const tab = (req.query.tab as string) || 'joined';
 
   if (tab === 'owned') {
-    const groups = db.prepare(`
-      SELECT g.*, (SELECT COUNT(*) FROM group_members gm WHERE gm.group_id = g.id) as member_count
-      FROM groups g
-      WHERE g.owner_id = ?
-      ORDER BY g.created_at DESC
-    `).all(hostId);
-    return res.json({ groups });
+    const groups = await Group.find({ ownerId: hostId }).sort({ createdAt: -1 }).lean();
+    const result = [];
+    for (const g of groups) {
+      const memberCount = await GroupMember.countDocuments({ groupId: g.id });
+      result.push({ ...g, member_count: memberCount });
+    }
+    return res.json({ groups: result });
   }
 
-  const groups = db.prepare(`
-    SELECT g.*, gm.role,
-           (SELECT COUNT(*) FROM group_members gm2 WHERE gm2.group_id = g.id) as member_count
-    FROM groups g
-    JOIN group_members gm ON gm.group_id = g.id
-    WHERE gm.host_id = ? AND g.owner_id != ?
-    ORDER BY gm.joined_at DESC
-  `).all(hostId, hostId);
+  const memberships = await GroupMember.find({ hostId, groupId: { $exists: true } }).lean();
+  const groupIds = memberships.map((m) => m.groupId);
+  const groups = await Group.find({ id: { $in: groupIds }, ownerId: { $ne: hostId } }).lean();
 
-  res.json({ groups });
+  const result = [];
+  for (const g of groups) {
+    const member = memberships.find((m) => m.groupId === g.id);
+    const memberCount = await GroupMember.countDocuments({ groupId: g.id });
+    result.push({ ...g, role: member?.role, member_count: memberCount });
+  }
+
+  res.json({ groups: result });
 });
 
-router.post('/', authenticateToken, (req: Request, res: Response) => {
-  const db = getDb();
+router.post('/', authenticateToken, async (req: Request, res: Response) => {
   const hostId = (req as any).hostId;
   const { name, description } = req.body;
 
@@ -48,24 +48,28 @@ router.post('/', authenticateToken, (req: Request, res: Response) => {
   let inviteCode = generateInviteCode();
   let attempts = 0;
   while (attempts < 10) {
-    const existing = db.prepare('SELECT id FROM groups WHERE invite_code = ?').get(inviteCode);
+    const existing = await Group.findOne({ inviteCode });
     if (!existing) break;
     inviteCode = generateInviteCode();
     attempts++;
   }
 
-  const result = db.prepare(
-    'INSERT INTO groups (owner_id, name, description, invite_code) VALUES (?, ?, ?, ?)'
-  ).run(hostId, name.trim(), description || '', inviteCode);
+  const id = await nextId('groups');
+  const group = await Group.create({
+    id,
+    ownerId: hostId,
+    name: name.trim(),
+    description: description || '',
+    inviteCode,
+  });
 
-  const groupId = result.lastInsertRowid;
-  db.prepare('INSERT INTO group_members (group_id, host_id, role) VALUES (?, ?, ?)').run(groupId, hostId, 'owner');
+  const memberId = await nextId('group_members');
+  await GroupMember.create({ id: memberId, groupId: id, hostId, role: 'owner' });
 
-  res.json({ group: { id: groupId, name, description, invite_code: inviteCode } });
+  res.json({ group: { id, name: name.trim(), description, invite_code: inviteCode } });
 });
 
-router.post('/join', authenticateToken, (req: Request, res: Response) => {
-  const db = getDb();
+router.post('/join', authenticateToken, async (req: Request, res: Response) => {
   const hostId = (req as any).hostId;
   const { inviteCode } = req.body;
 
@@ -73,31 +77,32 @@ router.post('/join', authenticateToken, (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Invite code is required' });
   }
 
-  const group = db.prepare('SELECT * FROM groups WHERE invite_code = ?').get(inviteCode.toUpperCase()) as any;
+  const group = await Group.findOne({ inviteCode: inviteCode.toUpperCase() });
   if (!group) {
     return res.status(404).json({ error: 'Invalid invite code' });
   }
 
-  const existing = db.prepare('SELECT * FROM group_members WHERE group_id = ? AND host_id = ?').get(group.id, hostId);
+  const existing = await GroupMember.findOne({ groupId: group.id, hostId });
   if (existing) {
     return res.status(400).json({ error: 'Already a member of this group' });
   }
 
-  db.prepare('INSERT INTO group_members (group_id, host_id, role) VALUES (?, ?, ?)').run(group.id, hostId, 'member');
+  const memberId = await nextId('group_members');
+  await GroupMember.create({ id: memberId, groupId: group.id, hostId, role: 'member' });
   res.json({ group });
 });
 
-router.delete('/:id', authenticateToken, (req: Request, res: Response) => {
-  const db = getDb();
+router.delete('/:id', authenticateToken, async (req: Request, res: Response) => {
   const hostId = (req as any).hostId;
-  const groupId = req.params.id;
+  const groupId = Number(req.params.id);
 
-  const group = db.prepare('SELECT * FROM groups WHERE id = ? AND owner_id = ?').get(groupId, hostId);
+  const group = await Group.findOne({ id: groupId, ownerId: hostId });
   if (!group) {
     return res.status(404).json({ error: 'Group not found' });
   }
 
-  db.prepare('DELETE FROM groups WHERE id = ?').run(groupId);
+  await Group.deleteOne({ id: groupId });
+  await GroupMember.deleteMany({ groupId });
   res.json({ success: true });
 });
 

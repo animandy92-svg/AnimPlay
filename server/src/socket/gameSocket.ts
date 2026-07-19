@@ -1,6 +1,6 @@
 import { Server as SocketServer, Socket } from 'socket.io';
 import { randomUUID } from 'crypto';
-import { getDb } from '../db';
+import { Game, Quiz, Question, Answer, GameResult, nextId } from '../models';
 import type { GameRoom, Player, LeaderboardEntry, QuestionWithOptions, QuizDetail } from '../../../shared/types';
 
 const badWordsList = ['badword1', 'badword2', 'trollname']; // Extend this list
@@ -29,7 +29,7 @@ export function setupGameSocket(io: SocketServer) {
   io.on('connection', (socket: Socket) => {
     console.log(`Client connected: ${socket.id}`);
 
-    socket.on('join-game', (data: { gamePin: string; nickname: string }) => {
+    socket.on('join-game', async (data: { gamePin: string; nickname: string }) => {
       const { gamePin, nickname } = data;
       const MAX_PLAYERS = 100;
 
@@ -37,14 +37,7 @@ export function setupGameSocket(io: SocketServer) {
         return socket.emit('join-error', { message: 'Please choose an appropriate nickname!' });
       }
 
-      const db = getDb();
-      const game = db.prepare(`
-        SELECT g.*, q.id as qid
-        FROM games g
-        JOIN quizzes q ON q.id = g.quiz_id
-        WHERE g.game_pin = ? AND g.status = 'lobby'
-      `).get(gamePin) as any;
-
+      const game = await Game.findOne({ gamePin, status: 'lobby' }).lean();
       if (!game) {
         socket.emit('error', { message: 'Game not found or already started' });
         return;
@@ -53,35 +46,29 @@ export function setupGameSocket(io: SocketServer) {
       let room = gameRooms.get(gamePin);
 
       if (!room) {
-        const questions = db.prepare(`
-          SELECT * FROM questions WHERE quiz_id = ? ORDER BY sort_order
-        `).all(game.quiz_id) as QuestionWithOptions[];
-
+        const questions = await Question.find({ quizId: game.quizId }).sort({ sortOrder: 1 }).lean() as QuestionWithOptions[];
         for (const q of questions) {
-          q.answers = db.prepare('SELECT * FROM answers WHERE question_id = ? ORDER BY sort_index').all(q.id) as any[];
+          (q as any).answers = await Answer.find({ questionId: q.id }).sort({ sortIndex: 1 }).lean();
         }
 
+        const quizData = await Quiz.findOne({ id: game.quizId }).lean();
         const quiz: QuizDetail = {
-          id: game.quiz_id,
-          host_id: game.host_id,
-          title: '',
-          description: '',
-          cover_image: null,
-          is_public: true,
-          created_at: '',
-          updated_at: '',
+          id: game.quizId,
+          host_id: game.hostId,
+          title: quizData?.title || '',
+          description: quizData?.description || '',
+          cover_image: quizData?.coverImage || null,
+          is_public: quizData?.isPublic ?? true,
+          created_at: quizData?.createdAt ? quizData.createdAt.toISOString() : '',
+          updated_at: quizData?.updatedAt ? quizData.updatedAt.toISOString() : '',
           questions,
         };
-
-        const quizData = db.prepare('SELECT * FROM quizzes WHERE id = ?').get(game.quiz_id) as any;
-        quiz.title = quizData.title;
-        quiz.description = quizData.description;
 
         room = {
           gameId: game.id,
           gamePin,
-          quizId: game.quiz_id,
-          hostId: game.host_id,
+          quizId: game.quizId,
+          hostId: game.hostId,
           hostSocketId: '',
           status: 'lobby',
           currentQuestionIndex: 0,
@@ -255,9 +242,7 @@ export function setupGameSocket(io: SocketServer) {
       room.currentQuestionIndex = 0;
       room.startedAt = new Date();
 
-      const db = getDb();
-      db.prepare('UPDATE games SET status = ?, started_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .run('active', room.gameId);
+      await Game.updateOne({ id: room.gameId }, { $set: { status: 'active', startedAt: new Date() } });
 
       io.to(gamePin).emit('game-started', {
         totalQuestions: room.quiz.questions.length,
@@ -530,31 +515,26 @@ function showQuestionResults(room: ServerGameRoom, io: SocketServer) {
   });
 }
 
-function endGame(room: ServerGameRoom, io: SocketServer) {
+async function endGame(room: ServerGameRoom, io: SocketServer) {
   clearQuestionTimers(room);
   room.status = 'finished';
 
-  const db = getDb();
-  db.prepare('UPDATE games SET status = ?, ended_at = CURRENT_TIMESTAMP WHERE id = ?')
-    .run('finished', room.gameId);
+  await Game.updateOne({ id: room.gameId }, { $set: { status: 'finished', endedAt: new Date() } });
 
   const leaderboard = getLeaderboard(room);
 
-  const insertResult = db.prepare(
-    'INSERT INTO game_results (game_id, nickname, score, correct, total, streak, rank) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  );
-
   for (const entry of leaderboard) {
-    const player = Array.from(room.players.values()).find(p => p.nickname === entry.nickname);
-    insertResult.run(
-      room.gameId,
-      entry.nickname,
-      entry.score,
-      entry.correct,
-      room.quiz.questions.length,
-      entry.streak,
-      entry.rank
-    );
+    const resultId = await nextId('game_results');
+    await GameResult.create({
+      id: resultId,
+      gameId: room.gameId,
+      nickname: entry.nickname,
+      score: entry.score,
+      correct: entry.correct,
+      total: room.quiz.questions.length,
+      streak: entry.streak,
+      rank: entry.rank,
+    });
   }
 
   io.to(room.gamePin).emit('game-ended', { finalRankings: leaderboard });

@@ -1,12 +1,11 @@
 import { Router, Request, Response } from 'express';
-import { getDb } from '../db';
+import { Game, Quiz, Question, GameResult, nextId } from '../models';
 import { authenticateToken } from './auth';
 import { generateGamePin } from '../utils/pin';
 
 const router = Router();
 
-router.post('/start', authenticateToken, (req: Request, res: Response) => {
-  const db = getDb();
+router.post('/start', authenticateToken, async (req: Request, res: Response) => {
   const hostId = (req as any).hostId;
   const { quizId } = req.body;
 
@@ -14,63 +13,61 @@ router.post('/start', authenticateToken, (req: Request, res: Response) => {
     return res.status(400).json({ error: 'quizId is required' });
   }
 
-  const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND host_id = ?').get(quizId, hostId) as any;
+  const quiz = await Quiz.findOne({ id: Number(quizId), hostId });
   if (!quiz) {
     return res.status(404).json({ error: 'Quiz not found' });
   }
 
-  const questionCount = db.prepare('SELECT COUNT(*) as count FROM questions WHERE quiz_id = ?').get(quizId) as any;
-  if (questionCount.count === 0) {
+  const questionCount = await Question.countDocuments({ quizId: Number(quizId) });
+  if (questionCount === 0) {
     return res.status(400).json({ error: 'Quiz has no questions' });
   }
 
   let gamePin = generateGamePin();
   let attempts = 0;
   while (attempts < 10) {
-    const existing = db.prepare('SELECT id FROM games WHERE game_pin = ? AND status != ?').get(gamePin, 'finished');
+    const existing = await Game.findOne({ gamePin, status: { $ne: 'finished' } });
     if (!existing) break;
     gamePin = generateGamePin();
     attempts++;
   }
 
-  const result = db.prepare(
-    'INSERT INTO games (game_pin, quiz_id, host_id, status) VALUES (?, ?, ?, ?)'
-  ).run(gamePin, quizId, hostId, 'lobby');
+  const id = await nextId('games');
+  const game = await Game.create({
+    id,
+    gamePin,
+    quizId: Number(quizId),
+    hostId,
+    status: 'lobby',
+    currentQuestion: 0,
+    startedAt: null,
+    endedAt: null,
+  });
 
-  res.json({ gameId: result.lastInsertRowid, gamePin });
+  res.json({ gameId: id, gamePin });
 });
 
-router.get('/:pin', (req: Request, res: Response) => {
-  const db = getDb();
+router.get('/:pin', async (req: Request, res: Response) => {
   const pin = req.params.pin;
 
-  const game = db.prepare(`
-    SELECT g.*, q.title as quiz_title
-    FROM games g
-    JOIN quizzes q ON q.id = g.quiz_id
-    WHERE g.game_pin = ?
-  `).get(pin) as any;
-
+  const game = await Game.findOne({ gamePin: pin }).lean();
   if (!game) {
     return res.status(404).json({ error: 'Game not found' });
   }
 
-  res.json({ game });
+  const quiz = await Quiz.findOne({ id: game.quizId }).lean();
+  res.json({ game: { ...game, quiz_title: quiz?.title } });
 });
 
-router.get('/:pin/results', (req: Request, res: Response) => {
-  const db = getDb();
+router.get('/:pin/results', async (req: Request, res: Response) => {
   const pin = req.params.pin;
 
-  const game = db.prepare('SELECT id FROM games WHERE game_pin = ?').get(pin) as any;
+  const game = await Game.findOne({ gamePin: pin }).lean();
   if (!game) {
     return res.status(404).json({ error: 'Game not found' });
   }
 
-  const results = db.prepare(
-    'SELECT * FROM game_results WHERE game_id = ? ORDER BY rank'
-  ).all(game.id);
-
+  const results = await GameResult.find({ gameId: game.id }).sort({ rank: 1 }).lean();
   res.json({ results });
 });
 

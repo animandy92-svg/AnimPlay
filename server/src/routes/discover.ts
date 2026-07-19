@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getDb } from '../db';
+import { Quiz, Question, Host } from '../models';
 
 const router = Router();
 
@@ -9,43 +9,47 @@ router.get('/categories', (_req: Request, res: Response) => {
   res.json({ categories: CATEGORIES });
 });
 
-router.get('/quizzes', (req: Request, res: Response) => {
-  const db = getDb();
+router.get('/quizzes', async (req: Request, res: Response) => {
   const { search = '', category = '', sort = 'popular' } = req.query as Record<string, string>;
 
-  let query = `
-    SELECT q.*, h.username as creator_name, COUNT(qu.id) as question_count
-    FROM quizzes q
-    JOIN hosts h ON h.id = q.host_id
-    LEFT JOIN questions qu ON qu.quiz_id = q.id
-    WHERE q.is_public = 1 AND q.status = 'published' AND q.deleted_at IS NULL
-  `;
-  const params: string[] = [];
+  const filter: any = {
+    isPublic: true,
+    status: 'published',
+    deletedAt: null,
+  };
 
   if (search) {
-    query += ' AND (q.title LIKE ? OR q.description LIKE ?)';
-    params.push(`%${search}%`, `%${search}%`);
+    filter.$or = [
+      { title: { $regex: search, $options: 'i' } },
+      { description: { $regex: search, $options: 'i' } },
+    ];
   }
   if (category && category !== 'all') {
-    query += ' AND q.category = ?';
-    params.push(category);
+    filter.category = category;
   }
 
-  query += ' GROUP BY q.id';
-  query += sort === 'newest' ? ' ORDER BY q.created_at DESC' : ' ORDER BY q.play_count DESC';
+  let sortOption: any = { playCount: -1 };
+  if (sort === 'newest') sortOption = { createdAt: -1 };
 
-  const quizzes = db.prepare(query).all(...params);
-  res.json({ quizzes });
+  const quizzes = await Quiz.find(filter).sort(sortOption).lean();
+
+  const result = [];
+  for (const q of quizzes) {
+    const host = await Host.findOne({ id: q.hostId }, { username: 1 }).lean();
+    const questionCount = await Question.countDocuments({ quizId: q.id });
+    result.push({ ...q, creator_name: host?.username || '', question_count: questionCount });
+  }
+
+  res.json({ quizzes: result });
 });
 
-router.post('/:quizId/play', (req: Request, res: Response) => {
-  const db = getDb();
-  const quizId = req.params.quizId;
-  const quiz = db.prepare('SELECT id FROM quizzes WHERE id = ? AND is_public = 1').get(quizId);
+router.post('/:quizId/play', async (req: Request, res: Response) => {
+  const quizId = Number(req.params.quizId);
+  const quiz = await Quiz.findOne({ id: quizId, isPublic: true });
   if (!quiz) {
     return res.status(404).json({ error: 'Quiz not found' });
   }
-  db.prepare('UPDATE quizzes SET play_count = play_count + 1 WHERE id = ?').run(quizId);
+  await Quiz.updateOne({ id: quizId }, { $inc: { playCount: 1 } });
   res.json({ success: true });
 });
 
