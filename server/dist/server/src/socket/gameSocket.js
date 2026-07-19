@@ -20,6 +20,45 @@ const socketToGame = new Map();
 function getGameByPin(pin) {
     return gameRooms.get(pin);
 }
+async function createRoom(gamePin) {
+    const game = await models_1.Game.findOne({ gamePin, status: 'lobby' }).lean();
+    if (!game)
+        return undefined;
+    const questions = await models_1.Question.find({ quizId: game.quizId }).sort({ sortOrder: 1 }).lean();
+    for (const q of questions) {
+        q.answers = await models_1.Answer.find({ questionId: q.id }).sort({ sortIndex: 1 }).lean();
+    }
+    const quizData = await models_1.Quiz.findOne({ id: game.quizId }).lean();
+    const quiz = {
+        id: game.quizId,
+        hostId: game.hostId,
+        title: quizData?.title || '',
+        description: quizData?.description || '',
+        coverImage: quizData?.coverImage || null,
+        isPublic: quizData?.isPublic ?? true,
+        created_at: quizData?.created_at ? quizData.created_at.toISOString() : '',
+        updated_at: quizData?.updated_at ? quizData.updated_at.toISOString() : '',
+        questions: questions,
+    };
+    const room = {
+        gameId: game.id,
+        gamePin,
+        quizId: game.quizId,
+        hostId: game.hostId,
+        hostSocketId: '',
+        status: 'lobby',
+        currentQuestionIndex: 0,
+        players: new Map(),
+        teams: [],
+        teamMembers: [],
+        powerUps: [],
+        chatMessages: [],
+        quiz,
+        startedAt: new Date(),
+    };
+    gameRooms.set(gamePin, room);
+    return room;
+}
 function setupGameSocket(io) {
     io.on('connection', (socket) => {
         console.log(`Client connected: ${socket.id}`);
@@ -36,39 +75,11 @@ function setupGameSocket(io) {
             }
             let room = gameRooms.get(gamePin);
             if (!room) {
-                const questions = await models_1.Question.find({ quizId: game.quizId }).sort({ sortOrder: 1 }).lean();
-                for (const q of questions) {
-                    q.answers = await models_1.Answer.find({ questionId: q.id }).sort({ sortIndex: 1 }).lean();
+                room = await createRoom(gamePin);
+                if (!room) {
+                    socket.emit('error', { message: 'Game not found or already started' });
+                    return;
                 }
-                const quizData = await models_1.Quiz.findOne({ id: game.quizId }).lean();
-                const quiz = {
-                    id: game.quizId,
-                    hostId: game.hostId,
-                    title: quizData?.title || '',
-                    description: quizData?.description || '',
-                    coverImage: quizData?.coverImage || null,
-                    isPublic: quizData?.isPublic ?? true,
-                    created_at: quizData?.created_at ? quizData.created_at.toISOString() : '',
-                    updated_at: quizData?.updated_at ? quizData.updated_at.toISOString() : '',
-                    questions: questions,
-                };
-                room = {
-                    gameId: game.id,
-                    gamePin,
-                    quizId: game.quizId,
-                    hostId: game.hostId,
-                    hostSocketId: '',
-                    status: 'lobby',
-                    currentQuestionIndex: 0,
-                    players: new Map(),
-                    teams: [],
-                    teamMembers: [],
-                    powerUps: [],
-                    chatMessages: [],
-                    quiz,
-                    startedAt: new Date(),
-                };
-                gameRooms.set(gamePin, room);
             }
             if (room.players.size >= MAX_PLAYERS) {
                 return socket.emit('join-error', { message: 'This lobby is full!' });
@@ -112,9 +123,14 @@ function setupGameSocket(io) {
             });
             console.log(`Player "${nickname}" joined game ${gamePin}. Total: ${room.players.size}`);
         });
-        socket.on('host-register', (data) => {
-            const room = gameRooms.get(data.gamePin);
-            if (room && room.hostId === data.hostId) {
+        socket.on('host-register', async (data) => {
+            let room = gameRooms.get(data.gamePin);
+            if (!room) {
+                room = await createRoom(data.gamePin);
+                if (!room)
+                    return;
+            }
+            if (room.hostId === data.hostId) {
                 room.hostSocketId = socket.id;
                 socketToGame.set(socket.id, data.gamePin);
                 socket.join(data.gamePin);

@@ -1,6 +1,8 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server as SocketServer } from 'socket.io';
 import { connectDb, disconnectDb } from './db';
@@ -13,8 +15,6 @@ import groupRoutes from './routes/groups';
 import learningRoutes from './routes/learning';
 import folderRoutes from './routes/folders';
 import { setupGameSocket } from './socket/gameSocket';
-
-dotenv.config();
 
 const PORT = process.env.PORT || 3001;
 const app = express();

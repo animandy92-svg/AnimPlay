@@ -33,6 +33,49 @@ export function getGameByPin(pin: string): ServerGameRoom | undefined {
   return gameRooms.get(pin);
 }
 
+async function createRoom(gamePin: string): Promise<ServerGameRoom | undefined> {
+  const game = await Game.findOne({ gamePin, status: 'lobby' }).lean();
+  if (!game) return undefined;
+
+  const questions = await Question.find({ quizId: game.quizId }).sort({ sortOrder: 1 }).lean();
+  for (const q of questions) {
+    (q as any).answers = await Answer.find({ questionId: q.id }).sort({ sortIndex: 1 }).lean();
+  }
+
+  const quizData = await Quiz.findOne({ id: game.quizId }).lean();
+  const quiz: QuizDetail = {
+    id: game.quizId,
+    hostId: game.hostId,
+    title: quizData?.title || '',
+    description: quizData?.description || '',
+    coverImage: quizData?.coverImage || null,
+    isPublic: quizData?.isPublic ?? true,
+    created_at: quizData?.created_at ? quizData.created_at.toISOString() : '',
+    updated_at: quizData?.updated_at ? quizData.updated_at.toISOString() : '',
+    questions: questions as unknown as QuestionWithOptions[],
+  };
+
+  const room: ServerGameRoom = {
+    gameId: game.id,
+    gamePin,
+    quizId: game.quizId,
+    hostId: game.hostId,
+    hostSocketId: '',
+    status: 'lobby',
+    currentQuestionIndex: 0,
+    players: new Map<string, ServerPlayer>(),
+    teams: [],
+    teamMembers: [],
+    powerUps: [],
+    chatMessages: [],
+    quiz,
+    startedAt: new Date(),
+  };
+
+  gameRooms.set(gamePin, room);
+  return room;
+}
+
 export function setupGameSocket(io: SocketServer) {
   io.on('connection', (socket: Socket) => {
     console.log(`Client connected: ${socket.id}`);
@@ -54,41 +97,11 @@ export function setupGameSocket(io: SocketServer) {
       let room = gameRooms.get(gamePin);
 
       if (!room) {
-        const questions = await Question.find({ quizId: game.quizId }).sort({ sortOrder: 1 }).lean();
-        for (const q of questions) {
-          (q as any).answers = await Answer.find({ questionId: q.id }).sort({ sortIndex: 1 }).lean();
+        room = await createRoom(gamePin);
+        if (!room) {
+          socket.emit('error', { message: 'Game not found or already started' });
+          return;
         }
-
-        const quizData = await Quiz.findOne({ id: game.quizId }).lean();
-        const quiz: QuizDetail = {
-          id: game.quizId,
-          hostId: game.hostId,
-          title: quizData?.title || '',
-          description: quizData?.description || '',
-          coverImage: quizData?.coverImage || null,
-          isPublic: quizData?.isPublic ?? true,
-          created_at: quizData?.created_at ? quizData.created_at.toISOString() : '',
-          updated_at: quizData?.updated_at ? quizData.updated_at.toISOString() : '',
-          questions: questions as unknown as QuestionWithOptions[],
-        };
-
-        room = {
-          gameId: game.id,
-          gamePin,
-          quizId: game.quizId,
-          hostId: game.hostId,
-          hostSocketId: '',
-          status: 'lobby',
-          currentQuestionIndex: 0,
-          players: new Map<string, ServerPlayer>(),
-          teams: [],
-          teamMembers: [],
-          powerUps: [],
-          chatMessages: [],
-          quiz,
-          startedAt: new Date(),
-        };
-        gameRooms.set(gamePin, room);
       }
 
       if (room.players.size >= MAX_PLAYERS) {
@@ -140,9 +153,15 @@ export function setupGameSocket(io: SocketServer) {
       console.log(`Player "${nickname}" joined game ${gamePin}. Total: ${room.players.size}`);
     });
 
-    socket.on('host-register', (data: { gamePin: string; hostId: number }) => {
-      const room = gameRooms.get(data.gamePin);
-      if (room && room.hostId === data.hostId) {
+    socket.on('host-register', async (data: { gamePin: string; hostId: number }) => {
+      let room = gameRooms.get(data.gamePin);
+
+      if (!room) {
+        room = await createRoom(data.gamePin);
+        if (!room) return;
+      }
+
+      if (room.hostId === data.hostId) {
         room.hostSocketId = socket.id;
         socketToGame.set(socket.id, data.gamePin);
         socket.join(data.gamePin);

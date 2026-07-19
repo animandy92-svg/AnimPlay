@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: animplay-backend
+    env: node
+    region: ohio
+    plan: free
+    buildCommand: cd server && npm install && npm run build
+    startCommand: cd server && node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: MONGO_URI
+        value: mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/animplay_db?retryWrites=true&w=majority
+      - key: JWT_SECRET
+        value: change-me-to-a-long-random-string-in-production
+      - key: GOOGLE_CLIENT_ID
+        value: your-google-client-id.apps.googleusercontent.com
