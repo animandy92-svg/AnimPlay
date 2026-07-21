@@ -15,8 +15,11 @@ export default function JoinGame() {
   const [joining, setJoining] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
+  const [character, setCharacter] = useState<string | null>(null);
   const navigate = useNavigate();
   const { emit, on } = useSocket();
+
+  const CHARACTERS = ['🦊', '🐱', '🐶', '🦄', '🐸', '🦁', '🐼', '🐨', '🦉', '🐙', '🦋', '🐢'];
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +80,7 @@ export default function JoinGame() {
     if (isReconnectAttempt && storedSessionId) {
       emit('reconnect-player', { sessionId: storedSessionId, nickname: nickname.trim(), gamePin });
     } else {
-      emit('join-game', { gamePin, nickname: nickname.trim(), teamId: selectedTeam ?? undefined });
+      emit('join-game', { gamePin, nickname: nickname.trim(), teamId: selectedTeam ?? undefined, character: character ?? undefined });
     }
   };
 
@@ -151,6 +154,26 @@ export default function JoinGame() {
               </div>
             </div>
           )}
+
+          <div className="mb-6">
+            <label className="block text-gray-600 font-bold mb-2 text-lg">
+              Choose Character
+            </label>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {CHARACTERS.map(char => (
+                <button
+                  key={char}
+                  type="button"
+                  onClick={() => setCharacter(char)}
+                  className={`text-3xl w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all ${
+                    character === char ? 'border-animplay-purple bg-animplay-purple/10 scale-110' : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {char}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {error && (
             <div className="mb-4 text-animplay-red font-bold text-center">

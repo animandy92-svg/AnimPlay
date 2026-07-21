@@ -141,6 +141,7 @@ export interface Player {
   hasAnswered: boolean;
   answers: PlayerAnswer[];
   teamId?: number;
+  character?: string;
   powerUps: PlayerPowerUp[];
 }
 
@@ -160,6 +161,7 @@ export interface LeaderboardEntry {
   streak: number;
   teamId?: number;
   teamName?: string;
+  character?: string;
 }
 
 export const ANSWER_COLORS = ['red', 'blue', 'yellow', 'green'] as const;
@@ -178,13 +180,13 @@ export const REACTIONS = ['👍', '❤️', '😂', '😮', '👏', '🔥'] as c
 
 export interface SocketEvents {
   // Client -> Server
-  'join-game': (data: { gamePin: string; nickname: string; teamId?: number }) => void;
+  'join-game': (data: { gamePin: string; nickname: string; teamId?: number; character?: string }) => void;
   'answer-submitted': (data: { gameId: number; questionId: number; answerIndex: number; responseTimeMs: number }) => void;
   'host-start-game': (data: { gameId: number }) => void;
   'host-next-question': (data: { gameId: number }) => void;
   'host-end-game': (data: { gameId: number }) => void;
   'host-register': (data: { gamePin: string; hostId: number }) => void;
-  'reconnect-player': (data: { sessionId: string; nickname: string; gamePin?: string }) => void;
+  'reconnect-player': (data: { sessionId: string; nickname: string; gamePin?: string; character?: string }) => void;
   'kick-player': (data: { gamePin: string; playerId: string }) => void;
   'create-team': (data: { gamePin: string; name: string; color: string }) => void;
   'join-team': (data: { gamePin: string; teamId: number }) => void;
@@ -195,16 +197,16 @@ export interface SocketEvents {
   'host-judge': (data: { gamePin: string; questionId: number; playerId: string; points: number }) => void;
 
   // Server -> Client
-  'player-joined': (data: { playerId: string; nickname: string; playerCount: number; teamId?: number }) => void;
+  'player-joined': (data: { playerId: string; nickname: string; playerCount: number; teamId?: number; character?: string }) => void;
   'player-left': (data: { playerId: string; nickname: string; playerCount: number }) => void;
   'player-reconnected': (data: { playerId: string; playerCount: number }) => void;
   'player-list': (data: { players: string[] }) => void;
-  'update-player-list': (data: { playerId: string; nickname: string; teamId?: number }[]) => void;
+  'update-player-list': (data: { playerId: string; nickname: string; teamId?: number; character?: string }[]) => void;
   'kicked-from-game': (data: { message: string }) => void;
   'host-disconnected': () => void;
   'game-started': (data: { totalQuestions: number }) => void;
   'host-question-start': (data: { questionId: number; questionText: string; answers: { text: string; color: string }[]; timer: number; startsAt: number; questionIndex: number; totalQuestions: number; questionType: QuestionType }) => void;
-  'player-question-start': (data: { questionId: number; answerCount: number; timer: number; startsAt: number; questionIndex: number; totalQuestions: number; questionType: QuestionType }) => void;
+  'player-question-start': (data: { questionId: number; questionText: string; answers: { text: string; color: string }[]; answerCount: number; timer: number; startsAt: number; questionIndex: number; totalQuestions: number; questionType: QuestionType }) => void;
   'answer-received': (data: { answeredCount: number; totalCount: number }) => void;
   'answer-confirmed': (data: { accepted: boolean; playerId?: string; sessionId?: string }) => void;
   'timer-tick': (data: { timeLeft: number }) => void;

@@ -6,6 +6,7 @@ interface HostPlayer {
   playerId: string;
   nickname: string;
   teamId?: number;
+  character?: string;
 }
 
 interface Team {
@@ -40,10 +41,10 @@ export default function HostLobby() {
   }, [connected, emit, gamePin, gameId, hostData.id, navigate]);
 
   useEffect(() => {
-    const unsubPlayer = on('player-joined', (data: { playerId: string; nickname: string; playerCount: number; teamId?: number }) => {
+    const unsubPlayer = on('player-joined', (data: { playerId: string; nickname: string; playerCount: number; teamId?: number; character?: string }) => {
       setPlayers(prev => {
         if (prev.some(player => player.playerId === data.playerId)) return prev;
-        return [...prev, { playerId: data.playerId, nickname: data.nickname, teamId: data.teamId }];
+        return [...prev, { playerId: data.playerId, nickname: data.nickname, teamId: data.teamId, character: data.character }];
       });
     });
 
@@ -56,9 +57,9 @@ export default function HostLobby() {
       navigate('/host/game');
     });
 
-    const unsubPlayerList = on('update-player-list', (updatedPlayers: { playerId: string; nickname: string; teamId?: number }[]) => {
-      setPlayers(updatedPlayers.map((player) => ({ playerId: player.playerId, nickname: player.nickname, teamId: player.teamId })));
-    });
+  const unsubPlayerList = on('update-player-list', (updatedPlayers: { playerId: string; nickname: string; teamId?: number; character?: string }[]) => {
+    setPlayers(updatedPlayers.map((player) => ({ playerId: player.playerId, nickname: player.nickname, teamId: player.teamId, character: player.character })));
+  });
 
     const unsubTeamCreated = on('team-created', (data: { teamId: number; name: string; color: string }) => {
       setTeams(prev => [...prev, { id: data.teamId, name: data.name, color: data.color }]);
@@ -163,7 +164,7 @@ export default function HostLobby() {
                   <div className="flex flex-wrap gap-2">
                     {teamPlayers(team.id).map(player => (
                       <span key={player.playerId} className="bg-white/20 text-white text-xs px-2 py-1 rounded-full">
-                        {player.nickname}
+                        {player.character ? `${player.character} ` : ''}{player.nickname}
                       </span>
                     ))}
                   </div>
@@ -178,7 +179,7 @@ export default function HostLobby() {
               <div className="flex flex-wrap gap-2">
                 {unassignedPlayers.map(player => (
                   <span key={player.playerId} className="bg-white/10 text-white/80 text-xs px-2 py-1 rounded-full">
-                    {player.nickname}
+                    {player.character ? `${player.character} ` : ''}{player.nickname}
                   </span>
                 ))}
               </div>

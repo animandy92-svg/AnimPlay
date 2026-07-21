@@ -3,7 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 
 export default function Lobby() {
-  const [players, setPlayers] = useState<string[]>([]);
+  interface LobbyPlayer {
+    nickname: string;
+    character?: string;
+  }
+  const [players, setPlayers] = useState<LobbyPlayer[]>([]);
   const [started, setStarted] = useState(false);
   const [totalQuestions, setTotalQuestions] = useState(0);
   const navigate = useNavigate();
@@ -23,15 +27,15 @@ export default function Lobby() {
   );
 
   useEffect(() => {
-    const unsubPlayer = on('player-joined', (data: { playerId: string; nickname: string; playerCount: number }) => {
+    const unsubPlayer = on('player-joined', (data: { playerId: string; nickname: string; playerCount: number; teamId?: number; character?: string }) => {
       setPlayers(prev => {
-        if (prev.includes(data.nickname)) return prev;
-        return [...prev, data.nickname];
+        if (prev.some(p => p.nickname === data.nickname)) return prev;
+        return [...prev, { nickname: data.nickname, character: data.character }];
       });
     });
 
     const unsubPlayerList = on('player-list', (data: { players: string[] }) => {
-      setPlayers(data.players);
+      setPlayers(data.players.map(n => ({ nickname: n, character: undefined })));
     });
 
     const unsubReconnected = on('player-reconnected', () => {
@@ -47,7 +51,7 @@ export default function Lobby() {
     });
 
     const unsubPlayerLeft = on('player-left', (data: { playerId: string; nickname: string; playerCount: number }) => {
-      setPlayers(prev => prev.filter(n => n !== data.nickname));
+      setPlayers(prev => prev.filter(p => p.nickname !== data.nickname));
     });
 
     const unsubStarted = on('game-started', handleGameStarted);
@@ -114,11 +118,12 @@ export default function Lobby() {
             ) : (
               players.map((p, i) => (
                 <div
-                  key={p}
-                  className="bg-animplay-purple/10 text-animplay-purple px-4 py-2 rounded-full font-bold animate-bounce-in"
+                  key={p.nickname}
+                  className="bg-animplay-purple/10 text-animplay-purple px-4 py-2 rounded-full font-bold animate-bounce-in flex items-center gap-2"
                   style={{ animationDelay: `${i * 100}ms` }}
                 >
-                  {p}
+                  <span>{p.character || '😶'}</span>
+                  <span>{p.nickname}</span>
                 </div>
               ))
             )}

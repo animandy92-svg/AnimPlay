@@ -8,6 +8,7 @@ interface LeaderboardEntry {
   score: number;
   correct: number;
   streak: number;
+  character?: string;
 }
 
 export default function Results() {
@@ -16,8 +17,18 @@ export default function Results() {
   const { on } = useSocket();
 
   useEffect(() => {
+    const storedRankings = localStorage.getItem('animplay_finalRankings');
+    if (storedRankings) {
+      try {
+        setRankings(JSON.parse(storedRankings));
+      } catch {
+        console.error('Failed to parse final rankings');
+      }
+    }
+
     const unsubGameEnd = on('game-ended', (data: { finalRankings: LeaderboardEntry[] }) => {
       setRankings(data.finalRankings);
+      localStorage.setItem('animplay_finalRankings', JSON.stringify(data.finalRankings));
     });
 
     return () => unsubGameEnd();
@@ -50,7 +61,7 @@ export default function Results() {
           <div className="text-center animate-slide-up" style={{ animationDelay: '200ms' }}>
             <div className="bg-white/10 rounded-2xl p-4 mb-2 w-32">
               <div className="text-4xl mb-1">🥈</div>
-              <div className="text-white font-bold text-lg">{second.nickname}</div>
+              <div className="text-white font-bold text-lg">{second.character ? `${second.character} ` : ''}{second.nickname}</div>
               <div className="text-white/70">{second.score.toLocaleString()}</div>
             </div>
             <div className="bg-white/20 h-24 rounded-t-xl flex items-center justify-center">
@@ -63,7 +74,7 @@ export default function Results() {
           <div className="text-center animate-slide-up" style={{ animationDelay: '0ms' }}>
             <div className="bg-white/10 rounded-2xl p-4 mb-2 w-36">
               <div className="text-5xl mb-1">🥇</div>
-              <div className="text-white font-bold text-xl">{first.nickname}</div>
+              <div className="text-white font-bold text-xl">{first.character ? `${first.character} ` : ''}{first.nickname}</div>
               <div className="text-white/70">{first.score.toLocaleString()}</div>
             </div>
             <div className="bg-animplay-yellow h-32 rounded-t-xl flex items-center justify-center animate-pulse-glow">
@@ -76,7 +87,7 @@ export default function Results() {
           <div className="text-center animate-slide-up" style={{ animationDelay: '400ms' }}>
             <div className="bg-white/10 rounded-2xl p-4 mb-2 w-32">
               <div className="text-4xl mb-1">🥉</div>
-              <div className="text-white font-bold text-lg">{third.nickname}</div>
+              <div className="text-white font-bold text-lg">{third.character ? `${third.character} ` : ''}{third.nickname}</div>
               <div className="text-white/70">{third.score.toLocaleString()}</div>
             </div>
             <div className="bg-white/20 h-16 rounded-t-xl flex items-center justify-center">
@@ -91,7 +102,7 @@ export default function Results() {
           <h3 className="text-white font-bold mb-3">Other Players</h3>
           {rankings.slice(3).map(entry => (
             <div key={entry.rank} className="flex justify-between text-white py-2 border-b border-white/10">
-              <span>#{entry.rank} {entry.nickname}</span>
+              <span>#{entry.rank} {entry.character ? `${entry.character} ` : ''}{entry.nickname}</span>
               <span className="font-bold">{entry.score.toLocaleString()}</span>
             </div>
           ))}

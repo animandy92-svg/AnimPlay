@@ -254,7 +254,7 @@ export default function HostGame() {
                   {entry.rank}
                 </div>
                 <div className="flex-1">
-                  {entry.nickname}
+                  {entry.character ? <span className="mr-1">{entry.character}</span> : ''}{entry.nickname}
                   {entry.teamName && <span className="text-xs text-gray-400 ml-2">({entry.teamName})</span>}
                 </div>
                 <div className="font-bold">{entry.score.toLocaleString()}</div>
@@ -297,7 +297,7 @@ export default function HostGame() {
                   {entry.rank}
                 </div>
                 <div className="flex-1 text-lg">
-                  {entry.nickname}
+                  {entry.character ? <span className="mr-1">{entry.character}</span> : ''}{entry.nickname}
                   {entry.teamName && <span className="text-xs text-gray-400 ml-2">({entry.teamName})</span>}
                 </div>
                 <div className="font-bold text-lg">{entry.score.toLocaleString()}</div>

@@ -80,8 +80,8 @@ export function setupGameSocket(io: SocketServer) {
   io.on('connection', (socket: Socket) => {
     console.log(`Client connected: ${socket.id}`);
 
-    socket.on('join-game', async (data: { gamePin: string; nickname: string; teamId?: number }) => {
-      const { gamePin, nickname, teamId } = data;
+    socket.on('join-game', async (data: { gamePin: string; nickname: string; teamId?: number; character?: string }) => {
+      const { gamePin, nickname, teamId, character } = data;
       const MAX_PLAYERS = 100;
 
       if (!isSafeNickname(nickname)) {
@@ -121,6 +121,7 @@ export function setupGameSocket(io: SocketServer) {
         hasAnswered: false,
         answers: [],
         teamId: teamId,
+        character: character,
         powerUps: [],
       };
 
@@ -148,6 +149,7 @@ export function setupGameSocket(io: SocketServer) {
         nickname,
         playerCount: room.players.size,
         teamId: player.teamId,
+        character: player.character,
       });
 
       console.log(`Player "${nickname}" joined game ${gamePin}. Total: ${room.players.size}`);
@@ -171,6 +173,7 @@ export function setupGameSocket(io: SocketServer) {
           playerId: player.id,
           nickname: player.nickname,
           teamId: player.teamId,
+          character: player.character,
         })));
         socket.emit('team-updated', { teams: room.teams });
       }
@@ -206,6 +209,7 @@ export function setupGameSocket(io: SocketServer) {
           playerId: player.id,
           nickname: player.nickname,
           teamId: player.teamId,
+          character: player.character,
         })));
       }
 
@@ -257,6 +261,7 @@ export function setupGameSocket(io: SocketServer) {
         playerId: p.id,
         nickname: p.nickname,
         teamId: p.teamId,
+        character: p.character,
       })));
     });
 
@@ -356,8 +361,8 @@ export function setupGameSocket(io: SocketServer) {
       io.to(data.gamePin).emit('answer-confirmed', { accepted: true, playerId: data.playerId });
     });
 
-    socket.on('reconnect-player', (data: { sessionId: string; nickname: string; gamePin?: string }) => {
-      const { sessionId, nickname, gamePin: requestedGamePin } = data;
+    socket.on('reconnect-player', (data: { sessionId: string; nickname: string; gamePin?: string; character?: string }) => {
+      const { sessionId, nickname, gamePin: requestedGamePin, character } = data;
       const currentGamePin = socketToGame.get(socket.id);
       let room: ServerGameRoom | undefined;
 
@@ -389,6 +394,7 @@ export function setupGameSocket(io: SocketServer) {
 
       existingPlayer.socketId = socket.id;
       existingPlayer.nickname = nickname;
+      if (character) existingPlayer.character = character;
       socketToGame.set(socket.id, room.gamePin);
       socket.join(room.gamePin);
 
@@ -408,11 +414,14 @@ export function setupGameSocket(io: SocketServer) {
           if (timeLeft > 0) {
             socket.emit('player-question-start', {
               questionId: question.id,
+              questionText: question.questionText,
+              answers: question.answers.map(a => ({ text: a.text, color: a.color })),
               answerCount: question.answers.length,
               timer: question.timerSeconds,
               startsAt: room.questionStartTime,
               questionIndex: room.currentQuestionIndex,
               totalQuestions: room.quiz.questions.length,
+              questionType: question.questionType,
             });
           }
         }
@@ -468,8 +477,11 @@ export function setupGameSocket(io: SocketServer) {
         if (player.socketId) {
           io.to(player.socketId).emit('player-question-start', {
             questionId: question.id,
+            questionText: question.questionText,
+            answers: question.answers.map(a => ({ text: a.text, color: a.color })),
             answerCount: question.answers.length,
             timer: question.timerSeconds,
+            startsAt: room.questionStartTime,
             questionIndex: room.currentQuestionIndex,
             totalQuestions: room.quiz.questions.length,
             questionType: question.questionType,
@@ -626,6 +638,7 @@ export function setupGameSocket(io: SocketServer) {
                 playerId: player.id,
                 nickname: player.nickname,
                 teamId: player.teamId,
+                character: player.character,
               })));
             }
 
@@ -694,6 +707,8 @@ function sendQuestion(room: ServerGameRoom, io: SocketServer) {
     if (player.socketId) {
       io.to(player.socketId).emit('player-question-start', {
         questionId: question.id,
+        questionText: question.questionText,
+        answers: question.answers.map(a => ({ text: a.text, color: a.color })),
         answerCount: question.answers.length,
         timer: question.timerSeconds,
         startsAt,
@@ -798,6 +813,7 @@ function getLeaderboard(room: ServerGameRoom): LeaderboardEntry[] {
       streak: player.streak,
       teamId: player.teamId,
       teamName: team?.name,
+      character: player.character,
     };
   });
 }
