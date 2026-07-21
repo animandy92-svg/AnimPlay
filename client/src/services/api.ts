@@ -66,6 +66,11 @@ export const api = {
       request(`/quizzes/${quizId}/questions/${questionId}`, { method: 'PUT', body: JSON.stringify(question) }),
     deleteQuestion: (quizId: number, questionId: number) =>
       request(`/quizzes/${quizId}/questions/${questionId}`, { method: 'DELETE' }),
+    aiGenerate: (topic: string, audience: string, count: number) =>
+      request('/quizzes/ai-generate', {
+        method: 'POST',
+        body: JSON.stringify({ topic, audience, count }),
+      }),
   },
   games: {
     start: (quizId: number, gameMode?: 'classic' | 'team') =>

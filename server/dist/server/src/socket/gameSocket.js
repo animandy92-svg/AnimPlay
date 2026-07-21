@@ -63,7 +63,7 @@ function setupGameSocket(io) {
     io.on('connection', (socket) => {
         console.log(`Client connected: ${socket.id}`);
         socket.on('join-game', async (data) => {
-            const { gamePin, nickname, teamId } = data;
+            const { gamePin, nickname, teamId, character } = data;
             const MAX_PLAYERS = 100;
             if (!isSafeNickname(nickname)) {
                 return socket.emit('join-error', { message: 'Please choose an appropriate nickname!' });
@@ -97,6 +97,7 @@ function setupGameSocket(io) {
                 hasAnswered: false,
                 answers: [],
                 teamId: teamId,
+                character: character,
                 powerUps: [],
             };
             room.players.set(playerId, player);
@@ -120,6 +121,7 @@ function setupGameSocket(io) {
                 nickname,
                 playerCount: room.players.size,
                 teamId: player.teamId,
+                character: player.character,
             });
             console.log(`Player "${nickname}" joined game ${gamePin}. Total: ${room.players.size}`);
         });
@@ -139,6 +141,7 @@ function setupGameSocket(io) {
                     playerId: player.id,
                     nickname: player.nickname,
                     teamId: player.teamId,
+                    character: player.character,
                 })));
                 socket.emit('team-updated', { teams: room.teams });
             }
@@ -170,6 +173,7 @@ function setupGameSocket(io) {
                     playerId: player.id,
                     nickname: player.nickname,
                     teamId: player.teamId,
+                    character: player.character,
                 })));
             }
             if (room.status === 'active') {
@@ -216,6 +220,7 @@ function setupGameSocket(io) {
                 playerId: p.id,
                 nickname: p.nickname,
                 teamId: p.teamId,
+                character: p.character,
             })));
         });
         socket.on('buy-powerup', (data) => {
@@ -306,7 +311,7 @@ function setupGameSocket(io) {
             io.to(data.gamePin).emit('answer-confirmed', { accepted: true, playerId: data.playerId });
         });
         socket.on('reconnect-player', (data) => {
-            const { sessionId, nickname, gamePin: requestedGamePin } = data;
+            const { sessionId, nickname, gamePin: requestedGamePin, character } = data;
             const currentGamePin = socketToGame.get(socket.id);
             let room;
             if (requestedGamePin) {
@@ -333,6 +338,8 @@ function setupGameSocket(io) {
             }
             existingPlayer.socketId = socket.id;
             existingPlayer.nickname = nickname;
+            if (character)
+                existingPlayer.character = character;
             socketToGame.set(socket.id, room.gamePin);
             socket.join(room.gamePin);
             socket.emit('answer-confirmed', { accepted: true, playerId: existingPlayer.id, sessionId });
@@ -349,11 +356,14 @@ function setupGameSocket(io) {
                     if (timeLeft > 0) {
                         socket.emit('player-question-start', {
                             questionId: question.id,
+                            questionText: question.questionText,
+                            answers: question.answers.map(a => ({ text: a.text, color: a.color })),
                             answerCount: question.answers.length,
                             timer: question.timerSeconds,
                             startsAt: room.questionStartTime,
                             questionIndex: room.currentQuestionIndex,
                             totalQuestions: room.quiz.questions.length,
+                            questionType: question.questionType,
                         });
                     }
                 }
@@ -401,8 +411,11 @@ function setupGameSocket(io) {
                 if (player.socketId) {
                     io.to(player.socketId).emit('player-question-start', {
                         questionId: question.id,
+                        questionText: question.questionText,
+                        answers: question.answers.map(a => ({ text: a.text, color: a.color })),
                         answerCount: question.answers.length,
                         timer: question.timerSeconds,
+                        startsAt: room.questionStartTime,
                         questionIndex: room.currentQuestionIndex,
                         totalQuestions: room.quiz.questions.length,
                         questionType: question.questionType,
@@ -540,6 +553,7 @@ function setupGameSocket(io) {
                                 playerId: player.id,
                                 nickname: player.nickname,
                                 teamId: player.teamId,
+                                character: player.character,
                             })));
                         }
                         console.log(`Player "${player.nickname}" timed out and was removed from game ${gamePin}. Total: ${cleanupRoom.players.size}`);
@@ -594,6 +608,8 @@ function sendQuestion(room, io) {
         if (player.socketId) {
             io.to(player.socketId).emit('player-question-start', {
                 questionId: question.id,
+                questionText: question.questionText,
+                answers: question.answers.map(a => ({ text: a.text, color: a.color })),
                 answerCount: question.answers.length,
                 timer: question.timerSeconds,
                 startsAt,
@@ -682,6 +698,7 @@ function getLeaderboard(room) {
             streak: player.streak,
             teamId: player.teamId,
             teamName: team?.name,
+            character: player.character,
         };
     });
 }

@@ -127,6 +127,7 @@ export interface Player {
     hasAnswered: boolean;
     answers: PlayerAnswer[];
     teamId?: number;
+    character?: string;
     powerUps: PlayerPowerUp[];
 }
 export interface PlayerAnswer {
@@ -144,6 +145,7 @@ export interface LeaderboardEntry {
     streak: number;
     teamId?: number;
     teamName?: string;
+    character?: string;
 }
 export declare const ANSWER_COLORS: readonly ["red", "blue", "yellow", "green"];
 export declare const ANSWER_SHAPES: readonly ["triangle", "diamond", "circle", "square"];
@@ -174,6 +176,7 @@ export interface SocketEvents {
         gamePin: string;
         nickname: string;
         teamId?: number;
+        character?: string;
     }) => void;
     'answer-submitted': (data: {
         gameId: number;
@@ -198,6 +201,7 @@ export interface SocketEvents {
         sessionId: string;
         nickname: string;
         gamePin?: string;
+        character?: string;
     }) => void;
     'kick-player': (data: {
         gamePin: string;
@@ -239,6 +243,7 @@ export interface SocketEvents {
         nickname: string;
         playerCount: number;
         teamId?: number;
+        character?: string;
     }) => void;
     'player-left': (data: {
         playerId: string;
@@ -256,6 +261,7 @@ export interface SocketEvents {
         playerId: string;
         nickname: string;
         teamId?: number;
+        character?: string;
     }[]) => void;
     'kicked-from-game': (data: {
         message: string;
@@ -279,6 +285,11 @@ export interface SocketEvents {
     }) => void;
     'player-question-start': (data: {
         questionId: number;
+        questionText: string;
+        answers: {
+            text: string;
+            color: string;
+        }[];
         answerCount: number;
         timer: number;
         startsAt: number;
