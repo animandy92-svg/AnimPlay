@@ -24,7 +24,7 @@ const app = (0, express_1.default)();
 const httpServer = (0, http_1.createServer)(app);
 const io = new socket_io_1.Server(httpServer, {
     cors: {
-        origin: ['http://localhost:5173', 'http://localhost:3000'],
+        origin: ['http://localhost:5173', 'http://localhost:3000', 'https://animplay-872d3.web.app', 'https://animplay-k69u.onrender.com'],
         methods: ['GET', 'POST'],
     },
 });

@@ -135,6 +135,12 @@ function setupGameSocket(io) {
                 socketToGame.set(socket.id, data.gamePin);
                 socket.join(data.gamePin);
                 console.log(`Host registered for game ${data.gamePin}`);
+                socket.emit('update-player-list', Array.from(room.players.values()).map(player => ({
+                    playerId: player.id,
+                    nickname: player.nickname,
+                    teamId: player.teamId,
+                })));
+                socket.emit('team-updated', { teams: room.teams });
             }
         });
         socket.on('kick-player', (data) => {
@@ -163,6 +169,7 @@ function setupGameSocket(io) {
                 io.to(room.hostSocketId).emit('update-player-list', Array.from(room.players.values()).map(player => ({
                     playerId: player.id,
                     nickname: player.nickname,
+                    teamId: player.teamId,
                 })));
             }
             if (room.status === 'active') {
@@ -529,7 +536,11 @@ function setupGameSocket(io) {
                             playerCount: cleanupRoom.players.size,
                         });
                         if (cleanupRoom.hostSocketId) {
-                            io.to(cleanupRoom.hostSocketId).emit('update-player-list', Array.from(cleanupRoom.players.values()));
+                            io.to(cleanupRoom.hostSocketId).emit('update-player-list', Array.from(cleanupRoom.players.values()).map(player => ({
+                                playerId: player.id,
+                                nickname: player.nickname,
+                                teamId: player.teamId,
+                            })));
                         }
                         console.log(`Player "${player.nickname}" timed out and was removed from game ${gamePin}. Total: ${cleanupRoom.players.size}`);
                         if (cleanupRoom.status === 'active') {
