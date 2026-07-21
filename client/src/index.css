@@ -17,25 +17,34 @@ body {
   font-family: 'Fredoka One', 'Comic Neue', cursive;
 }
 
-@keyframes bounce-in {
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes floatUp {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.6; }
+  90% { opacity: 0.6; }
+  100% { transform: translateY(-120vh) rotate(360deg); opacity: 0; }
+}
+
+@keyframes springBounce {
   0% { transform: scale(0); opacity: 0; }
-  50% { transform: scale(1.1); }
+  50% { transform: scale(1.08); }
+  70% { transform: scale(0.96); }
   100% { transform: scale(1); opacity: 1; }
 }
 
-@keyframes slide-up {
-  from { transform: translateY(30px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+@keyframes gentleFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(15, 118, 110, 0.3); }
-  50% { box-shadow: 0 0 40px rgba(15, 118, 110, 0.6); }
-}
-
-@keyframes confetti {
-  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-  100% { transform: translateY(-100px) rotate(720deg); opacity: 0; }
+@keyframes pulseCyan {
+  0%, 100% { box-shadow: 0 0 25px rgba(0, 229, 255, 0.6); }
+  50% { box-shadow: 0 0 55px rgba(0, 229, 255, 1); }
 }
 
 .animate-bounce-in {
@@ -48,6 +57,23 @@ body {
 
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-gradient-bg {
+  animation: gradientBG 15s ease infinite;
+}
+
+.animate-spring-bounce {
+  animation: springBounce 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  opacity: 0;
+}
+
+.animate-gentle-float {
+  animation: gentleFloat 4s ease-in-out infinite;
+}
+
+.animate-pulse-cyan {
+  animation: pulseCyan 3s ease-in-out infinite;
 }
 
 .answer-shape-triangle {
