@@ -166,6 +166,13 @@ export function setupGameSocket(io: SocketServer) {
         socketToGame.set(socket.id, data.gamePin);
         socket.join(data.gamePin);
         console.log(`Host registered for game ${data.gamePin}`);
+
+        socket.emit('update-player-list', Array.from(room.players.values()).map(player => ({
+          playerId: player.id,
+          nickname: player.nickname,
+          teamId: player.teamId,
+        })));
+        socket.emit('team-updated', { teams: room.teams });
       }
     });
 
@@ -198,6 +205,7 @@ export function setupGameSocket(io: SocketServer) {
         io.to(room.hostSocketId).emit('update-player-list', Array.from(room.players.values()).map(player => ({
           playerId: player.id,
           nickname: player.nickname,
+          teamId: player.teamId,
         })));
       }
 
@@ -614,7 +622,11 @@ export function setupGameSocket(io: SocketServer) {
             });
 
             if (cleanupRoom.hostSocketId) {
-              io.to(cleanupRoom.hostSocketId).emit('update-player-list', Array.from(cleanupRoom.players.values()));
+              io.to(cleanupRoom.hostSocketId).emit('update-player-list', Array.from(cleanupRoom.players.values()).map(player => ({
+                playerId: player.id,
+                nickname: player.nickname,
+                teamId: player.teamId,
+              })));
             }
 
             console.log(`Player "${player.nickname}" timed out and was removed from game ${gamePin}. Total: ${cleanupRoom.players.size}`);
