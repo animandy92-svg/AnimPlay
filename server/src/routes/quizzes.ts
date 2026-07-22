@@ -30,18 +30,51 @@ async function callAi(prompt: string): Promise<any[]> {
     },
   };
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+  let response: globalThis.Response;
+  try {
+    response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      }
+    );
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('AI request timed out');
     }
-  );
+    throw new Error(`AI request failed: ${err.message}`);
+  }
+  clearTimeout(timeoutId);
+
+  if (!response.ok) {
+    let errorText = '';
+    try {
+      const errData = await response.json();
+      errorText = (errData as any)?.error?.message || JSON.stringify(errData);
+    } catch {
+      errorText = await response.text();
+    }
+    throw new Error(`Gemini API error (${response.status}): ${errorText}`);
+  }
 
   const data = await response.json() as any;
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('Empty AI response');
+
+  if (!text) {
+    const finishReason = data.candidates?.[0]?.finishReason;
+    if (finishReason === 'SAFETY' || finishReason === 'RECITATION') {
+      throw new Error('AI response blocked by safety filters');
+    }
+    throw new Error('Empty AI response');
+  }
+
   return parseAiJson(text);
 }
 

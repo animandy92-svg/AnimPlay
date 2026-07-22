@@ -44,6 +44,8 @@ export default function PlayerGame() {
   const [chatInput, setChatInput] = useState('');
   const [reactions, setReactions] = useState<{ playerId: string; reaction: string }[]>([]);
   const timerRef = useRef<number | null>(null);
+  const countdownRef = useRef<number | null>(null);
+  const leaderboardRef = useRef<number | null>(null);
   const navigate = useNavigate();
   const { emit, on } = useSocket();
 
@@ -65,12 +67,14 @@ export default function PlayerGame() {
       setIsCorrect(null);
       setPhase('countdown');
 
+      if (countdownRef.current) clearTimeout(countdownRef.current);
+
       const countdownTime = Math.max(0, data.startsAt - Date.now());
-      setTimeout(() => {
+      countdownRef.current = window.setTimeout(() => {
         setPhase('question');
         setTimeLeft(data.timer);
 
-        timerRef.current = setInterval(() => {
+        timerRef.current = window.setInterval(() => {
           setTimeLeft(prev => {
             if (prev <= 0.1) {
               if (timerRef.current) clearInterval(timerRef.current);
@@ -84,6 +88,8 @@ export default function PlayerGame() {
 
     const unsubResults = on('question-ended', (data: { correctIndex: number; stats: { answerIndex: number; count: number }[]; leaderboard: LeaderboardEntry[] }) => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (countdownRef.current) clearTimeout(countdownRef.current);
+      if (leaderboardRef.current) clearTimeout(leaderboardRef.current);
       setCorrectIndex(data.correctIndex);
       setStats(data.stats);
       setLeaderboard(data.leaderboard);
@@ -96,7 +102,7 @@ export default function PlayerGame() {
       const myEntry = data.leaderboard.find(e => e.nickname === localStorage.getItem('animplay_nickname'));
       if (myEntry) setMyScore(myEntry.score);
 
-      setTimeout(() => setPhase('leaderboard'), 3000);
+      leaderboardRef.current = window.setTimeout(() => setPhase('leaderboard'), 3000);
     });
 
     const unsubGameEnd = on('game-ended', (data: { finalRankings: LeaderboardEntry[] }) => {
@@ -145,6 +151,8 @@ export default function PlayerGame() {
       unsubChatReceived();
       unsubReactionReceived();
       if (timerRef.current) clearInterval(timerRef.current);
+      if (countdownRef.current) clearTimeout(countdownRef.current);
+      if (leaderboardRef.current) clearTimeout(leaderboardRef.current);
     };
   }, [on, navigate, selectedAnswer]);
 

@@ -20,12 +20,18 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
     headers,
   });
 
-  const data = await response.json();
-
   if (!response.ok) {
-    throw new Error(data.error || 'Request failed');
+    let errorText = '';
+    try {
+      const errData = await response.json();
+      errorText = errData?.error || errData?.message || JSON.stringify(errData);
+    } catch {
+      errorText = await response.text();
+    }
+    throw new Error(errorText || 'Request failed');
   }
 
+  const data = await response.json();
   return data;
 }
 

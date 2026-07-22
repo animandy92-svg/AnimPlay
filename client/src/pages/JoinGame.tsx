@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 
@@ -18,6 +18,14 @@ export default function JoinGame() {
   const [character, setCharacter] = useState<string | null>(null);
   const navigate = useNavigate();
   const { emit, on } = useSocket();
+
+  const unsubscribeRef = useRef<(() => void)[]>([]);
+
+  useEffect(() => {
+    return () => {
+      unsubscribeRef.current.forEach(unsub => unsub());
+    };
+  }, []);
 
   const CHARACTERS = ['🦊', '🐱', '🐶', '🦄', '🐸', '🦁', '🐼', '🐨', '🦉', '🐙', '🦋', '🐢'];
 
@@ -52,12 +60,14 @@ export default function JoinGame() {
       setJoining(false);
       unsubError();
     });
+    unsubscribeRef.current.push(unsubError);
 
     const unsubJoinError = on('join-error', (data: { message: string }) => {
       setError(data.message);
       setJoining(false);
       unsubJoinError();
     });
+    unsubscribeRef.current.push(unsubJoinError);
 
     const unsubConfirm = on('answer-confirmed', (data: { accepted: boolean; playerId?: string; sessionId?: string }) => {
       if (data.accepted) {
@@ -72,10 +82,12 @@ export default function JoinGame() {
       unsubJoinError();
       unsubConfirm();
     });
+    unsubscribeRef.current.push(unsubConfirm);
 
     const unsubTeamUpdated = on('team-updated', (data: { teams: Team[] }) => {
       setTeams(data.teams);
     });
+    unsubscribeRef.current.push(unsubTeamUpdated);
 
     if (isReconnectAttempt && storedSessionId) {
       emit('reconnect-player', { sessionId: storedSessionId, nickname: nickname.trim(), gamePin });

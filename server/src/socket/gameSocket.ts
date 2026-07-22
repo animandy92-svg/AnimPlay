@@ -463,11 +463,15 @@ export function setupGameSocket(io: SocketServer) {
       const question = room.quiz.questions[room.currentQuestionIndex];
       if (!question) return;
 
+      const startsAt = Date.now() + 1000;
+      room.questionStartTime = startsAt;
+
       io.to(room.hostSocketId).emit('host-question-start', {
         questionId: question.id,
         questionText: question.questionText,
         answers: question.answers.map(a => ({ text: a.text, color: a.color })),
         timer: question.timerSeconds,
+        startsAt,
         questionIndex: room.currentQuestionIndex,
         totalQuestions: room.quiz.questions.length,
         questionType: question.questionType,
@@ -481,7 +485,7 @@ export function setupGameSocket(io: SocketServer) {
             answers: question.answers.map(a => ({ text: a.text, color: a.color })),
             answerCount: question.answers.length,
             timer: question.timerSeconds,
-            startsAt: room.questionStartTime,
+            startsAt,
             questionIndex: room.currentQuestionIndex,
             totalQuestions: room.quiz.questions.length,
             questionType: question.questionType,
@@ -489,7 +493,9 @@ export function setupGameSocket(io: SocketServer) {
         }
       }
 
-      startTimer(room, io, question.timerSeconds);
+      setTimeout(() => {
+        startTimer(room, io, question.timerSeconds);
+      }, 1000);
 
       console.log(`Game ${gamePin} started. Timer set for ${question.timerSeconds}s.`);
     });

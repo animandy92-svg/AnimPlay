@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 import type { QuestionType, ChatMessage as IChatMessage, LeaderboardEntry } from '@shared/types';
@@ -32,6 +32,7 @@ export default function HostGame() {
   const [pendingAnswers, setPendingAnswers] = useState<PendingAnswer[]>([]);
   const [chatMessages, setChatMessages] = useState<IChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
+  const leaderboardTimeoutRef = useRef<number | null>(null);
   const navigate = useNavigate();
   const { emit, on } = useSocket();
 
@@ -64,13 +65,14 @@ export default function HostGame() {
     });
 
     const unsubResults = on('question-ended', (data: { correctIndex: number; stats: { answerIndex: number; count: number }[]; leaderboard: LeaderboardEntry[] }) => {
+      if (leaderboardTimeoutRef.current) clearTimeout(leaderboardTimeoutRef.current);
       setCorrectIndex(data.correctIndex);
       setStats(data.stats);
       setLeaderboard(data.leaderboard);
       setTotalAnswered(data.stats.reduce((sum, s) => sum + s.count, 0));
       setPhase('results');
 
-      setTimeout(() => setPhase('leaderboard'), 4000);
+      leaderboardTimeoutRef.current = window.setTimeout(() => setPhase('leaderboard'), 4000);
     });
 
     const unsubGameEnd = on('game-ended', (data: { finalRankings: LeaderboardEntry[] }) => {
@@ -106,6 +108,7 @@ export default function HostGame() {
       unsubGameEnd();
       unsubAnswerConfirmed();
       unsubChatReceived();
+      if (leaderboardTimeoutRef.current) clearTimeout(leaderboardTimeoutRef.current);
     };
   }, [on]);
 
@@ -139,7 +142,15 @@ export default function HostGame() {
     green: 'bg-animplay-green',
   };
 
-  if (phase === 'question' && question) {
+  if (phase === 'question') {
+    if (!question) {
+      return (
+        <div className="min-h-screen bg-animplay-purple flex items-center justify-center">
+          <div className="text-white text-2xl font-bold">Loading question data...</div>
+        </div>
+      );
+    }
+
     const timerPercent = (timeLeft / question.timer) * 100;
 
     return (
@@ -214,7 +225,15 @@ export default function HostGame() {
     );
   }
 
-  if ((phase === 'results' || phase === 'leaderboard') && question) {
+  if (phase === 'results' || phase === 'leaderboard') {
+    if (!question) {
+      return (
+        <div className="min-h-screen bg-animplay-purple flex items-center justify-center">
+          <div className="text-white text-2xl font-bold">Loading results...</div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-animplay-purple flex flex-col items-center justify-center p-8">
         <div className="bg-white rounded-3xl p-10 shadow-2xl w-full max-w-3xl mb-8">

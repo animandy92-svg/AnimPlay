@@ -71,7 +71,7 @@ export default function Dashboard() {
     if (!confirm('Move this quiz to trash?')) return;
     try {
       await api.quizzes.delete(id);
-      setQuizzes(quizzes.filter(q => q.id !== id));
+      setQuizzes(prev => prev.filter(q => q.id !== id));
     } catch {
       alert('Failed to delete quiz');
     }
@@ -81,7 +81,7 @@ export default function Dashboard() {
     if (!confirm('Permanently delete this quiz? This cannot be undone.')) return;
     try {
       await api.quizzes.permanentDelete(id);
-      setQuizzes(quizzes.filter(q => q.id !== id));
+      setQuizzes(prev => prev.filter(q => q.id !== id));
     } catch {
       alert('Failed to delete quiz');
     }
@@ -90,7 +90,7 @@ export default function Dashboard() {
   const handleRestore = async (id: number) => {
     try {
       await api.quizzes.restore(id);
-      setQuizzes(quizzes.filter(q => q.id !== id));
+      setQuizzes(prev => prev.filter(q => q.id !== id));
     } catch {
       alert('Failed to restore quiz');
     }
@@ -145,7 +145,7 @@ export default function Dashboard() {
     setAiLoading(true);
     try {
       const data = await api.quizzes.aiGenerate(topic, audience, count);
-      setQuizzes([data.quiz, ...quizzes]);
+      setQuizzes(prev => [data.quiz, ...prev]);
       setShowAiModal(false);
     } catch (err: any) {
       alert(err.message || 'Failed to generate quiz');
@@ -164,22 +164,22 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('recent');
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen p-6">
+      <div className="max-w-7xl mx-auto">
         <div className="flex flex-wrap gap-3 justify-between items-center mb-8">
-          <h1 className="font-display text-4xl text-animplay-brand">My Quizzes</h1>
+          <h1 className="font-display text-4xl text-white drop-shadow-lg">My Quizzes</h1>
           <div className="flex flex-wrap gap-3">
             <Link
               to="/quiz/new"
-              className="bg-animplay-brand text-white font-display text-lg py-3 px-6 rounded-xl
-                         hover:bg-animplay-brand-dark transition-colors"
+              className="bg-[#00e5ff] text-[#0f172a] font-display text-lg py-3 px-6 rounded-xl
+                         hover:scale-105 transition-transform shadow-[0_0_25px_rgba(0,229,255,0.5)] hover:shadow-[0_0_45px_rgba(0,229,255,0.8)]"
             >
               + Create Quiz
             </Link>
             <Link
               to="/quiz/new?sample=true"
-              className="bg-white border border-animplay-brand text-animplay-brand font-display text-lg py-3 px-6 rounded-xl
-                         hover:bg-animplay-brand/10 transition-colors"
+              className="bg-white/15 border border-white/30 text-white font-display text-lg py-3 px-6 rounded-xl
+                         hover:bg-white/25 transition-colors"
             >
               Load Sample Quiz
             </Link>
@@ -206,7 +206,7 @@ export default function Dashboard() {
               className={`relative px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors z-10 ${
                 !selectedFolder && quizTab === t.key
                   ? 'text-white'
-                  : 'text-gray-600 hover:text-gray-800'
+                  : 'text-white/70 hover:text-white'
               }`}
             >
               {t.label}
@@ -214,14 +214,14 @@ export default function Dashboard() {
           ))}
 
           <div
-            className="absolute top-0 h-full bg-animplay-brand rounded-xl transition-all duration-300 ease-out z-0"
+            className="absolute top-0 h-full bg-white/25 backdrop-blur rounded-xl transition-all duration-300 ease-out z-0"
             style={{
               left: QUIZ_TABS.findIndex(t => t.key === (selectedFolder ? 'recent' : activeTab)) * 72,
               width: 72,
             }}
           />
 
-          <div className="w-px bg-gray-300 mx-1" />
+          <div className="w-px bg-white/20 mx-1" />
 
           {folders.map(folder => (
             <div key={folder.id} className="flex items-center gap-1">
@@ -229,15 +229,15 @@ export default function Dashboard() {
                 onClick={() => { setSelectedFolder(folder.id); setQuizTab('recent'); setActiveTab('recent'); }}
                 className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${
                   selectedFolder === folder.id
-                    ? 'bg-animplay-accent text-white'
-                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                    ? 'bg-white/25 text-white backdrop-blur'
+                    : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
                 }`}
               >
                 📁 {folder.name}
               </button>
               <button
                 onClick={() => handleDeleteFolder(folder.id)}
-                className="text-gray-400 hover:text-animplay-red text-xs"
+                className="text-white/50 hover:text-red-300 text-xs"
               >
                 ×
               </button>
@@ -252,15 +252,15 @@ export default function Dashboard() {
                 onChange={(e) => setNewFolderName(e.target.value)}
                 placeholder="Folder name"
                 autoFocus
-                className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm w-32 focus:border-animplay-brand focus:outline-none"
+                className="px-3 py-2 border-2 border-white/30 bg-white/10 rounded-xl text-sm w-32 focus:border-white/60 focus:outline-none text-white placeholder-white/50"
               />
-              <button type="submit" className="text-animplay-brand font-bold text-sm px-2">✓</button>
-              <button type="button" onClick={() => { setShowNewFolder(false); setNewFolderName(''); }} className="text-gray-400 text-sm px-1">✕</button>
+              <button type="submit" className="text-white font-bold text-sm px-2">✓</button>
+              <button type="button" onClick={() => { setShowNewFolder(false); setNewFolderName(''); }} className="text-white/50 text-sm px-1">✕</button>
             </form>
           ) : (
             <button
               onClick={() => setShowNewFolder(true)}
-              className="px-4 py-2 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-200 transition-colors whitespace-nowrap"
+              className="px-4 py-2 rounded-xl text-sm font-bold text-white/70 hover:bg-white/10 transition-colors whitespace-nowrap"
             >
               + Folder
             </button>
@@ -270,28 +270,28 @@ export default function Dashboard() {
         {selectedFolder && (
           <button
             onClick={() => setSelectedFolder(null)}
-            className="text-animplay-brand hover:text-animplay-brand-dark text-sm font-bold mb-4"
+            className="text-[#00e5ff] hover:text-white text-sm font-bold mb-4"
           >
             ← Back to all quizzes
           </button>
         )}
 
         {loading ? (
-          <div className="text-center py-12 text-gray-500">Loading...</div>
+          <div className="text-center py-12 text-white/70">Loading...</div>
         ) : quizzes.length === 0 ? (
-          <div className="bg-white rounded-3xl p-12 shadow text-center">
+          <div className="backdrop-blur-md bg-white/10 border border-white/20 rounded-[2rem] p-12 shadow-2xl text-center">
             <div className="text-6xl mb-4">📝</div>
-            <h2 className="font-display text-2xl text-gray-700 mb-2">
+            <h2 className="font-display text-2xl text-white mb-2">
               {quizTab === 'trash' ? 'Trash is empty' : 'No quizzes yet'}
             </h2>
-            <p className="text-gray-500 mb-6">
+            <p className="text-white/70 mb-6">
               {quizTab === 'trash' ? 'Deleted quizzes will appear here' : 'Create your first quiz to get started!'}
             </p>
             {quizTab !== 'trash' && (
               <Link
                 to="/quiz/new"
-                className="bg-animplay-brand text-white font-display text-lg py-3 px-6 rounded-xl
-                           hover:bg-animplay-brand-dark transition-colors inline-block"
+                className="bg-[#00e5ff] text-[#0f172a] font-display text-lg py-3 px-6 rounded-xl
+                           hover:scale-105 transition-transform inline-block"
               >
                 Create Quiz
               </Link>
@@ -302,17 +302,17 @@ export default function Dashboard() {
             {quizzes.map((quiz, index) => (
               <div
                 key={quiz.id}
-                className="group bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)] transition-all duration-300 hover:-translate-y-1 animate-slide-up"
+                className="group backdrop-blur-md bg-white/15 border border-white/20 rounded-2xl p-5 shadow-2xl hover:bg-white/25 transition-all duration-300 hover:-translate-y-1 animate-slide-up"
                 style={{ animationDelay: `${index * 60}ms`, animationFillMode: 'both' }}
               >
                 <div className="flex items-start justify-between mb-3">
-                  <h3 className="font-bold text-lg text-gray-800 leading-tight line-clamp-2 flex-1">{quiz.title}</h3>
+                  <h3 className="font-bold text-lg text-white leading-tight line-clamp-2 flex-1">{quiz.title}</h3>
                   {quiz.status === 'draft' && (
-                    <span className="bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-0.5 rounded-full ml-2 whitespace-nowrap">Draft</span>
+                    <span className="bg-yellow-400/20 text-yellow-200 text-xs font-bold px-2 py-0.5 rounded-full ml-2 whitespace-nowrap">Draft</span>
                   )}
                 </div>
-                <p className="text-gray-500 text-sm mb-3 line-clamp-2">{quiz.description || 'No description'}</p>
-                <div className="text-xs text-gray-400 mb-4">
+                <p className="text-white/70 text-sm mb-3 line-clamp-2">{quiz.description || 'No description'}</p>
+                <div className="text-xs text-white/50 mb-4">
                   {quiz.question_count} question{quiz.question_count !== 1 ? 's' : ''}
                 </div>
 
@@ -338,8 +338,8 @@ export default function Dashboard() {
                     <button
                       onClick={() => handleStartGame(quiz.id)}
                       disabled={quiz.question_count === 0}
-                      className="w-10 h-10 flex items-center justify-center bg-animplay-green text-white rounded-full
-                                 hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-10 h-10 flex items-center justify-center bg-[#00e5ff] text-[#0f172a] rounded-full
+                                 hover:scale-110 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Play"
                     >
                       <svg className="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
@@ -348,8 +348,8 @@ export default function Dashboard() {
                     </button>
                     <Link
                       to={`/quiz/${quiz.id}/edit`}
-                      className="w-10 h-10 flex items-center justify-center bg-animplay-blue text-white rounded-full
-                                 hover:bg-blue-700 transition-colors"
+                      className="w-10 h-10 flex items-center justify-center bg-white/20 text-white rounded-full
+                                 hover:bg-white/35 transition-colors backdrop-blur"
                       title="Edit"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -359,7 +359,7 @@ export default function Dashboard() {
                     <button
                       onClick={() => handleToggleFavorite(quiz)}
                       className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
-                        quiz.is_favorite ? 'bg-yellow-100 text-yellow-500' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                        quiz.is_favorite ? 'bg-yellow-400/25 text-yellow-200' : 'bg-white/10 text-white/60 hover:bg-white/20'
                       }`}
                       title={quiz.is_favorite ? 'Unfavorite' : 'Favorite'}
                     >
@@ -369,8 +369,8 @@ export default function Dashboard() {
                     </button>
                     <button
                       onClick={() => handleDelete(quiz.id)}
-                      className="w-10 h-10 flex items-center justify-center bg-animplay-red text-white rounded-full
-                                 hover:bg-red-700 transition-colors"
+                      className="w-10 h-10 flex items-center justify-center bg-red-500/80 text-white rounded-full
+                                 hover:bg-red-600 transition-colors"
                       title="Delete"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -415,30 +415,30 @@ function AiModal({ onClose, onGenerate, loading }: AiModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6">
+      <div className="backdrop-blur-md bg-white/15 border border-white/25 rounded-[2rem] shadow-2xl max-w-md w-full p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="font-display text-2xl text-gray-800">✨ AI Quiz Generator</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+          <h2 className="font-display text-2xl text-white">✨ AI Quiz Generator</h2>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-2xl">×</button>
         </div>
-        <p className="text-gray-500 text-sm mb-6">Describe your quiz topic and let AI build it for you instantly.</p>
+        <p className="text-white/80 text-sm mb-6">Describe your quiz topic and let AI build it for you instantly.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Topic</label>
+            <label className="block text-sm font-bold text-white/90 mb-1">Topic</label>
             <input
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="e.g. Solar System, World War II, Cooking Basics"
-              className="w-full text-lg py-3 px-4 border-2 border-gray-200 rounded-xl focus:border-animplay-purple focus:outline-none"
+              className="w-full text-lg py-3 px-4 border-2 border-white/30 bg-white/10 rounded-xl focus:border-white/60 focus:outline-none text-white placeholder-white/50"
               autoFocus
             />
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Target Audience</label>
+            <label className="block text-sm font-bold text-white/90 mb-1">Target Audience</label>
             <select
               value={audience}
               onChange={(e) => setAudience(e.target.value)}
-              className="block w-full py-3 px-4 border-2 border-gray-200 rounded-xl focus:border-animplay-purple focus:outline-none"
+              className="block w-full py-3 px-4 border-2 border-white/30 bg-white/10 rounded-xl focus:border-white/60 focus:outline-none text-white"
             >
               <option value="Kids">Kids</option>
               <option value="Teens">Teens</option>
@@ -447,11 +447,11 @@ function AiModal({ onClose, onGenerate, loading }: AiModalProps) {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Number of Questions</label>
+            <label className="block text-sm font-bold text-white/90 mb-1">Number of Questions</label>
             <select
               value={count}
               onChange={(e) => setCount(Number(e.target.value))}
-              className="block w-full py-3 px-4 border-2 border-gray-200 rounded-xl focus:border-animplay-purple focus:outline-none"
+              className="block w-full py-3 px-4 border-2 border-white/30 bg-white/10 rounded-xl focus:border-white/60 focus:outline-none text-white"
             >
               <option value="3">3</option>
               <option value="5">5</option>
@@ -462,8 +462,8 @@ function AiModal({ onClose, onGenerate, loading }: AiModalProps) {
           <button
             type="submit"
             disabled={loading || !topic.trim()}
-            className="w-full bg-gradient-to-r from-animplay-purple to-animplay-purple-dark text-white font-display text-lg py-3 px-6 rounded-xl
-                       hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-[#00e5ff] text-[#0f172a] font-display text-lg py-3 px-6 rounded-xl
+                       hover:scale-105 transition-transform shadow-[0_0_25px_rgba(0,229,255,0.5)] hover:shadow-[0_0_45px_rgba(0,229,255,0.8)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Generating...' : 'Generate Quiz'}
           </button>

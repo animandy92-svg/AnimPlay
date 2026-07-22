@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import type { QuestionType } from '@shared/types';
@@ -81,7 +81,8 @@ export default function CreateQuiz() {
   const [showAddForm, setShowAddForm] = useState(true);
   const [searchParams] = useSearchParams();
 
-  const loadQuiz = async () => {
+  const loadQuiz = useCallback(async () => {
+    if (!id) return;
     try {
       const data = await api.quizzes.get(Number(id));
       setTitle(data.quiz.title);
@@ -94,11 +95,11 @@ export default function CreateQuiz() {
         answers: q.answers.map((a: any) => ({ text: a.text, color: a.color })),
         questionType: q.questionType || 'multiple_choice',
       })));
-    } catch (err) {
+    } catch {
       alert('Failed to load quiz');
       navigate('/dashboard');
     }
-  };
+  }, [id, navigate]);
 
   const loadSampleQuiz = () => {
     setTitle(SAMPLE_QUIZ.title);

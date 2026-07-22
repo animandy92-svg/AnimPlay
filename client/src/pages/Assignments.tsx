@@ -35,7 +35,7 @@ export default function Assignments() {
   const handleComplete = async (id: number) => {
     try {
       await api.learning.complete(id);
-      setAssignments(assignments.filter(a => a.id !== id));
+      setAssignments(prev => prev.filter(a => a.id !== id));
     } catch (err: any) {
       alert(err.message || 'Failed to complete assignment');
     }

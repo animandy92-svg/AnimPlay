@@ -4,6 +4,12 @@ node_modules/
 # Build output
 dist/
 
+# TypeScript build info
+*.tsbuildinfo
+
+# Firebase cache
+.firebase/
+
 # Secrets / environment
 .env
 .env.local

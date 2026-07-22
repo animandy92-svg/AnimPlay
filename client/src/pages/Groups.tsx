@@ -75,7 +75,7 @@ export default function Groups() {
     if (!confirm('Delete this group?')) return;
     try {
       await api.groups.delete(id);
-      setGroups(groups.filter(g => g.id !== id));
+      setGroups(prev => prev.filter(g => g.id !== id));
     } catch {
       alert('Failed to delete group');
     }

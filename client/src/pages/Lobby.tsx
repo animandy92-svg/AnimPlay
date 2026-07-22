@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 
@@ -13,9 +13,9 @@ export default function Lobby() {
   const navigate = useNavigate();
   const { emit, on } = useSocket();
 
-  const nickname = localStorage.getItem('animplay_nickname') || 'Player';
-  const sessionId = localStorage.getItem('animplay_player_sessionId');
-  const playerGamePin = localStorage.getItem('animplay_player_gamePin');
+  const nickname = useMemo(() => localStorage.getItem('animplay_nickname') || 'Player', []);
+  const sessionId = useMemo(() => localStorage.getItem('animplay_player_sessionId'), []);
+  const playerGamePin = useMemo(() => localStorage.getItem('animplay_player_gamePin'), []);
 
   const handleGameStarted = useCallback(
     (data: { totalQuestions: number }) => {

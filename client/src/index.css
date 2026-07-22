@@ -91,3 +91,13 @@ body {
 .answer-shape-square {
   border-radius: 8px;
 }
+
+select,
+select:focus {
+  color: #1a1a1a;
+}
+
+select option {
+  background-color: #ffffff;
+  color: #1a1a1a !important;
+}

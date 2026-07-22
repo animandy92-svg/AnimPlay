@@ -22,7 +22,9 @@ export default function Layout() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="relative min-h-screen flex">
+      <div className="absolute inset-0 bg-gradient-to-br from-[#512da8] via-[#9c27b0] via-[30%] via-[#ff1744] via-[60%] to-[#3f51b5] bg-[length:400%_400%] animate-gradient-bg" />
+
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-30 lg:hidden"
@@ -32,7 +34,7 @@ export default function Layout() {
 
       <aside
         className={`
-          fixed top-0 left-0 h-full w-64 bg-animplay-slate text-white z-40
+          fixed top-0 left-0 h-full w-64 bg-black/20 backdrop-blur-xl border-r border-white/10 text-white z-40
           transform transition-transform duration-200 ease-in-out
           lg:translate-x-0 lg:static lg:z-auto
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -53,8 +55,8 @@ export default function Layout() {
                 className={`
                   flex items-center gap-3 px-4 py-3 rounded-xl mb-1 text-sm font-bold transition-colors
                   ${isActive
-                    ? 'bg-animplay-brand text-white'
-                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    ? 'bg-white/20 text-white shadow-lg'
+                    : 'text-white/80 hover:bg-white/10 hover:text-white'
                   }
                 `}
               >
@@ -66,27 +68,27 @@ export default function Layout() {
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
-          <div className="text-white/50 text-xs mb-2 truncate">{host.username}</div>
+          <div className="text-white/70 text-xs mb-2 truncate">{host.username}</div>
           <button
             onClick={handleLogout}
-            className="text-white/40 hover:text-white text-xs transition-colors"
+            className="text-white/50 hover:text-white text-xs transition-colors"
           >
             Logout
           </button>
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-h-screen">
-        <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-4 lg:hidden">
+      <div className="relative z-10 flex-1 flex flex-col min-h-screen">
+        <header className="bg-black/10 backdrop-blur-md border-b border-white/10 px-4 py-3 flex items-center gap-4 lg:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="text-gray-600 hover:text-gray-900"
+            className="text-white/80 hover:text-white"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <Link to="/" className="font-display text-xl text-animplay-brand">AnimPlay</Link>
+          <Link to="/" className="font-display text-xl text-white">AnimPlay</Link>
         </header>
 
         <main className="flex-1">
