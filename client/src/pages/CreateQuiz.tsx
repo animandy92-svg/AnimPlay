@@ -125,12 +125,15 @@ export default function CreateQuiz() {
       return;
     }
     const validAnswers = currentQ.answers.filter(a => a.text.trim());
-    if (validAnswers.length < 2) {
+    if (currentQ.questionType !== 'open_ended' && validAnswers.length < 2) {
       alert('Please enter at least 2 answers');
       return;
     }
 
-    setQuestions([...questions, { ...currentQ }]);
+    setQuestions([...questions, {
+      ...currentQ,
+      answers: currentQ.questionType === 'open_ended' ? [] : validAnswers,
+    }]);
     setCurrentQ({
       question_text: '',
       timer_seconds: 20,

@@ -34,6 +34,7 @@ export default function PlayerGame() {
   const [question, setQuestion] = useState<QuestionData | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [openAnswer, setOpenAnswer] = useState('');
   const [correctIndex, setCorrectIndex] = useState<number>(0);
   const [stats, setStats] = useState<{ answerIndex: number; count: number }[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -62,6 +63,7 @@ export default function PlayerGame() {
     const unsubQuestion = on('player-question-start', (data: QuestionData) => {
       setQuestion(data);
       setSelectedAnswer(null);
+      setOpenAnswer('');
       setCorrectIndex(0);
       setStats([]);
       setIsCorrect(null);
@@ -157,7 +159,7 @@ export default function PlayerGame() {
   }, [on, navigate, selectedAnswer]);
 
   const handleAnswer = useCallback(
-    (answerIndex: number) => {
+    (answerIndex: number, responseText?: string) => {
       if (selectedAnswer !== null || !question) return;
 
       setSelectedAnswer(answerIndex);
@@ -168,6 +170,7 @@ export default function PlayerGame() {
         questionId: question.questionId,
         answerIndex,
         responseTimeMs,
+        responseText,
       });
     },
     [emit, question, selectedAnswer, timeLeft]
@@ -232,14 +235,25 @@ export default function PlayerGame() {
               {question.questionType === 'open_ended' ? 'Type your answer below!' : question.questionText}
             </h2>
             {question.questionType === 'open_ended' && (
-              <input
-                type="text"
-                className="mt-4 w-full text-center text-xl py-3 px-4 border-2 border-gray-200 rounded-xl focus:border-animplay-purple focus:outline-none"
-                placeholder="Your answer..."
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleAnswer(0);
-                }}
-              />
+              <div>
+                <input
+                  type="text"
+                  className="mt-4 w-full text-center text-xl py-3 px-4 border-2 border-gray-200 rounded-xl focus:border-animplay-purple focus:outline-none"
+                  placeholder="Your answer..."
+                  value={openAnswer}
+                  onChange={(e) => setOpenAnswer(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && openAnswer.trim()) handleAnswer(0, openAnswer);
+                  }}
+                />
+                <button
+                  onClick={() => handleAnswer(0, openAnswer)}
+                  disabled={!openAnswer.trim() || selectedAnswer !== null}
+                  className="mt-3 rounded-xl bg-animplay-purple px-6 py-3 font-bold text-white disabled:opacity-40"
+                >
+                  Submit answer
+                </button>
+              </div>
             )}
           </div>
         </div>

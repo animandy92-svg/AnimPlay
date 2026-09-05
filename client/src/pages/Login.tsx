@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { GoogleLogin } from '@react-oauth/google';
 import { api } from '../services/api';
 
 export default function Login() {
@@ -28,11 +27,11 @@ export default function Login() {
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse: any) => {
+  const handleGoogleSuccess = async () => {
     setError('');
     setLoading(true);
     try {
-      const data = await api.auth.google(credentialResponse.credential);
+      const data = await api.auth.google();
       localStorage.setItem('animplay_token', data.token);
       localStorage.setItem('animplay_host', JSON.stringify(data.host));
       navigate('/dashboard');
@@ -52,10 +51,10 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="backdrop-blur-md bg-white/15 border border-white/25 rounded-[2rem] p-8 shadow-2xl animate-slide-up">
           <div className="mb-4">
-            <label className="block text-white/90 font-bold mb-2">Username or Email</label>
+            <label className="block text-white/90 font-bold mb-2">Email address</label>
             <input
-              type="text"
-              name="username"
+              type="email"
+              name="email"
               autoComplete="username"
               value={login}
               onChange={(e) => setLogin(e.target.value)}
@@ -109,8 +108,7 @@ export default function Login() {
             {loading ? 'Logging in...' : 'Login'}
           </button>
 
-          {import.meta.env.VITE_GOOGLE_CLIENT_ID && (
-            <div className="mt-6">
+          <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-white/30"></div>
@@ -121,19 +119,11 @@ export default function Login() {
               </div>
 
               <div className="mt-4 flex justify-center">
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => {
-                    setError('Google sign-in failed');
-                    setLoading(false);
-                  }}
-                  theme="outline"
-                  shape="pill"
-                  text="signin_with"
-                />
+                <button type="button" onClick={handleGoogleSuccess} disabled={loading} className="w-full rounded-xl bg-white px-4 py-3 font-bold text-slate-800 shadow hover:bg-slate-50 disabled:opacity-50">
+                  <span className="mr-2 text-lg">G</span> Continue with Google
+                </button>
               </div>
-            </div>
-          )}
+          </div>
 
           <div className="mt-6 text-center text-white/70">
             Don't have an account?{' '}

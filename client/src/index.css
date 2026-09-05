@@ -10,7 +10,25 @@
 
 body {
   font-family: 'Nunito', 'Comic Neue', sans-serif;
-  background-color: #f5f5f5;
+  min-width: 320px;
+  background-color: #100d2c;
+  color: #172033;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+a,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(103, 232, 249, 0.9);
+  outline-offset: 3px;
 }
 
 .font-display {
@@ -100,4 +118,88 @@ select:focus {
 select option {
   background-color: #ffffff;
   color: #1a1a1a !important;
+}
+
+.home-shell {
+  background:
+    radial-gradient(circle at 15% 15%, rgba(0, 229, 255, 0.13), transparent 27%),
+    radial-gradient(circle at 88% 20%, rgba(236, 72, 153, 0.16), transparent 28%),
+    linear-gradient(135deg, #15113a 0%, #35206d 48%, #521f72 100%);
+}
+
+.aurora {
+  position: absolute;
+  width: 36rem;
+  height: 36rem;
+  border-radius: 999px;
+  filter: blur(80px);
+  opacity: 0.28;
+  pointer-events: none;
+  animation: aurora-drift 14s ease-in-out infinite alternate;
+}
+
+.aurora-one {
+  left: -14rem;
+  bottom: -12rem;
+  background: #22d3ee;
+}
+
+.aurora-two {
+  right: -14rem;
+  top: 8rem;
+  background: #f43f8e;
+  animation-delay: -6s;
+}
+
+.hero-highlight {
+  background: linear-gradient(90deg, #67e8f9, #f0abfc 52%, #fde68a);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.live-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #6ee7b7;
+  box-shadow: 0 0 0 0 rgba(110, 231, 183, 0.65);
+  animation: live-pulse 1.8s infinite;
+}
+
+.quiz-preview {
+  animation: preview-float 6s ease-in-out infinite;
+}
+
+.answer-pop {
+  animation: answer-pop 0.55s cubic-bezier(.2, .8, .2, 1) both;
+}
+
+@keyframes aurora-drift {
+  from { transform: translate3d(-2%, -2%, 0) scale(0.95); }
+  to { transform: translate3d(10%, 7%, 0) scale(1.1); }
+}
+
+@keyframes live-pulse {
+  70% { box-shadow: 0 0 0 9px rgba(110, 231, 183, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(110, 231, 183, 0); }
+}
+
+@keyframes preview-float {
+  0%, 100% { transform: translateY(0) rotate(1.5deg); }
+  50% { transform: translateY(-10px) rotate(0.5deg); }
+}
+
+@keyframes answer-pop {
+  from { opacity: 0; transform: translateY(10px) scale(.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

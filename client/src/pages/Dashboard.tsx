@@ -145,8 +145,8 @@ export default function Dashboard() {
     setAiLoading(true);
     try {
       const data = await api.quizzes.aiGenerate(topic, audience, count);
-      setQuizzes(prev => [data.quiz, ...prev]);
       setShowAiModal(false);
+      navigate(`/quiz/${data.quiz.id}/edit`);
     } catch (err: any) {
       alert(err.message || 'Failed to generate quiz');
     } finally {
@@ -189,7 +189,7 @@ export default function Dashboard() {
                          hover:opacity-90 transition-opacity flex items-center gap-2"
             >
               <span>✨</span>
-              <span>AI Auto-Generate</span>
+              <span>Quick-start Builder</span>
             </button>
           </div>
         </div>
@@ -417,10 +417,10 @@ function AiModal({ onClose, onGenerate, loading }: AiModalProps) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="backdrop-blur-md bg-white/15 border border-white/25 rounded-[2rem] shadow-2xl max-w-md w-full p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="font-display text-2xl text-white">✨ AI Quiz Generator</h2>
+          <h2 className="font-display text-2xl text-white">✨ Quick-start Builder</h2>
           <button onClick={onClose} className="text-white/70 hover:text-white text-2xl">×</button>
         </div>
-        <p className="text-white/80 text-sm mb-6">Describe your quiz topic and let AI build it for you instantly.</p>
+        <p className="text-white/80 text-sm mb-6">Create an editable question outline for your topic, then add the facts and answers that fit your audience.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-bold text-white/90 mb-1">Topic</label>
@@ -465,7 +465,7 @@ function AiModal({ onClose, onGenerate, loading }: AiModalProps) {
             className="w-full bg-[#00e5ff] text-[#0f172a] font-display text-lg py-3 px-6 rounded-xl
                        hover:scale-105 transition-transform shadow-[0_0_25px_rgba(0,229,255,0.5)] hover:shadow-[0_0_45px_rgba(0,229,255,0.8)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Generating...' : 'Generate Quiz'}
+            {loading ? 'Building...' : 'Build Starter'}
           </button>
         </form>
       </div>

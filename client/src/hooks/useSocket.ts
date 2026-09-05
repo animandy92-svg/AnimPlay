@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getSocket, connectSocket } from '../services/socket';
-import type { Socket } from 'socket.io-client';
+import { connectSocket, type FirebaseGameSocket } from '../services/socket';
 
 export function useSocket() {
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef = useRef<FirebaseGameSocket | null>(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
@@ -21,7 +20,9 @@ export function useSocket() {
 
   const on = useCallback((event: string, handler: (...args: any[]) => void) => {
     socketRef.current?.on(event, handler);
-    return () => socketRef.current?.off(event, handler);
+    return () => {
+      socketRef.current?.off(event, handler);
+    };
   }, []);
 
   const emit = useCallback((event: string, data?: any) => {

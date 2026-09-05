@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from '../services/firebase';
 
 const NAV_ITEMS = [
   { path: '/dashboard', label: 'My Quizzes', icon: '📝' },
@@ -11,15 +13,33 @@ const NAV_ITEMS = [
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
   const host = JSON.parse(localStorage.getItem('animplay_host') || '{}');
 
-  const handleLogout = () => {
+  useEffect(() => onAuthStateChanged(auth, user => {
+    if (!user || user.isAnonymous) navigate('/login', { replace: true });
+    setCheckingAuth(false);
+  }), [navigate]);
+
+  const handleLogout = async () => {
+    await signOut(auth);
     localStorage.removeItem('animplay_token');
     localStorage.removeItem('animplay_host');
     navigate('/');
   };
+
+  if (checkingAuth) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-[#15113a] text-white">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-cyan-300" />
+          <p className="font-bold text-white/70">Loading your space…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen flex">

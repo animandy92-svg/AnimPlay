@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { GoogleLogin } from '@react-oauth/google';
 import { api } from '../services/api';
 
 export default function Register() {
@@ -29,11 +28,11 @@ export default function Register() {
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse: any) => {
+  const handleGoogleSuccess = async () => {
     setError('');
     setLoading(true);
     try {
-      const data = await api.auth.google(credentialResponse.credential);
+      const data = await api.auth.google();
       localStorage.setItem('animplay_token', data.token);
       localStorage.setItem('animplay_host', JSON.stringify(data.host));
       navigate('/dashboard');
@@ -124,8 +123,7 @@ export default function Register() {
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
 
-          {import.meta.env.VITE_GOOGLE_CLIENT_ID && (
-            <div className="mt-6">
+          <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-white/30"></div>
@@ -136,19 +134,11 @@ export default function Register() {
               </div>
 
               <div className="mt-4 flex justify-center">
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => {
-                    setError('Google sign-in failed');
-                    setLoading(false);
-                  }}
-                  theme="outline"
-                  shape="pill"
-                  text="signin_with"
-                />
+                <button type="button" onClick={handleGoogleSuccess} disabled={loading} className="w-full rounded-xl bg-white px-4 py-3 font-bold text-slate-800 shadow hover:bg-slate-50 disabled:opacity-50">
+                  <span className="mr-2 text-lg">G</span> Continue with Google
+                </button>
               </div>
-            </div>
-          )}
+          </div>
 
           <div className="mt-6 text-center text-white/70">
             Already have an account?{' '}

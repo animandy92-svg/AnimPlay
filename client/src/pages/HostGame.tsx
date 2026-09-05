@@ -18,6 +18,7 @@ interface PendingAnswer {
   playerId: string;
   nickname: string;
   answerIndex: number;
+  responseText?: string;
 }
 
 export default function HostGame() {
@@ -54,6 +55,10 @@ export default function HostGame() {
     const unsubAnswerReceived = on('answer-received', (data: { answeredCount: number; totalCount: number }) => {
       setTotalAnswered(data.answeredCount);
       setPlayerCount(data.totalCount);
+    });
+
+    const unsubPendingAnswers = on('pending-answers', (data: { answers: PendingAnswer[] }) => {
+      setPendingAnswers(data.answers);
     });
 
     const unsubPlayerJoined = on('player-joined', (data: { playerId: string; nickname: string; playerCount: number }) => {
@@ -102,6 +107,7 @@ export default function HostGame() {
       unsubQuestion();
       unsubTimerTick();
       unsubAnswerReceived();
+      unsubPendingAnswers();
       unsubPlayerJoined();
       unsubPlayerLeft();
       unsubResults();
@@ -206,7 +212,7 @@ export default function HostGame() {
               <div className="flex flex-wrap gap-2 justify-center">
                 {pendingAnswers.map(answer => (
                   <div key={answer.playerId} className="bg-white/10 rounded-lg p-2 flex items-center gap-2">
-                    <span className="text-white text-sm">{answer.nickname}</span>
+                    <span className="text-white text-sm"><strong>{answer.nickname}:</strong> {answer.responseText || 'Submitted'}</span>
                     <button onClick={() => handleJudge(answer.playerId, 500)} className="bg-animplay-green text-white text-xs px-2 py-1 rounded">+500</button>
                     <button onClick={() => handleJudge(answer.playerId, 0)} className="bg-animplay-red text-white text-xs px-2 py-1 rounded">+0</button>
                   </div>

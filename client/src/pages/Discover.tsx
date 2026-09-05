@@ -21,7 +21,7 @@ export default function Discover() {
   const [cloningId, setCloningId] = useState<number | null>(null);
 
   useEffect(() => {
-    api.discover.categories().then(data => setCategories(data.categories));
+    api.discover.categories().then((data: { categories: string[] }) => setCategories(data.categories));
   }, []);
 
   useEffect(() => {
