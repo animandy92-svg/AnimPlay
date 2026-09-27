@@ -3,10 +3,11 @@ import {
   browserLocalPersistence,
   getAuth,
   onAuthStateChanged,
+  signInAnonymously,
   setPersistence,
   type User,
 } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { doc, getDoc, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 
 export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCJxEIioLgCJyhxAU4MZKJ9wDpifhDFI_I',
@@ -50,4 +51,16 @@ export async function requireUser(): Promise<User> {
 
 export function isPermanentUser(user: User): boolean {
   return !user.isAnonymous;
+}
+
+export async function isHostAccount(user: User | null): Promise<boolean> {
+  if (!user) return false;
+  if (isPermanentUser(user)) return true;
+
+  const profile = await getDoc(doc(db, 'users', user.uid));
+  return profile.exists() && profile.data().isHost === true;
+}
+
+export async function createUsernameAccount(): Promise<User> {
+  return auth.currentUser || (await signInAnonymously(auth)).user;
 }

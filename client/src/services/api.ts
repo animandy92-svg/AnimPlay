@@ -1,6 +1,5 @@
 import {
   GoogleAuthProvider,
-  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
   updateProfile,
@@ -17,7 +16,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { auth, db, isPermanentUser, requireUser, waitForAuth } from './firebase';
+import { auth, createUsernameAccount, db, isHostAccount, requireUser, waitForAuth } from './firebase';
 
 type AnyRecord = Record<string, any>;
 
@@ -42,7 +41,7 @@ function friendlyError(error: any): Error {
 
 async function userContext() {
   const user = await requireUser();
-  if (!isPermanentUser(user)) throw new Error('Please sign in as a host to continue.');
+  if (!await isHostAccount(user)) throw new Error('Please register a username to continue.');
   return user;
 }
 
@@ -52,6 +51,7 @@ async function syncHost(user: NonNullable<typeof auth.currentUser>, username?: s
     username: username || user.displayName || user.email?.split('@')[0] || 'Host',
     email: user.email || '',
     picture: user.photoURL || null,
+    isHost: true,
     created_at: user.metadata.creationTime || now(),
   };
   await setDoc(doc(db, 'users', user.uid), host, { merge: true });
@@ -139,12 +139,14 @@ async function getOwnedQuiz(id: number) {
 
 export const api: any = {
   auth: {
-    register: async (username: string, email: string, password: string) => {
+    register: async (username: string) => {
       try {
-        const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        await updateProfile(credential.user, { displayName: username.trim() });
-        const host = await syncHost(credential.user, username.trim());
-        return { token: await credential.user.getIdToken(), host };
+        const normalizedUsername = username.trim();
+        if (!normalizedUsername) throw new Error('Enter a username.');
+        const user = await createUsernameAccount();
+        await updateProfile(user, { displayName: normalizedUsername });
+        const host = await syncHost(user, normalizedUsername);
+        return { token: await user.getIdToken(), host };
       } catch (error) {
         throw friendlyError(error);
       }
@@ -169,7 +171,7 @@ export const api: any = {
     },
     me: async () => {
       const user = await waitForAuth();
-      if (!user || !isPermanentUser(user)) throw new Error('Please sign in.');
+      if (!await isHostAccount(user)) throw new Error('Please register a username.');
       return { host: await syncHost(user) };
     },
   },

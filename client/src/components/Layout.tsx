@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from '../services/firebase';
+import { auth, isHostAccount } from '../services/firebase';
 
 const NAV_ITEMS = [
   { path: '/dashboard', label: 'My Quizzes', icon: '📝' },
@@ -19,8 +19,13 @@ export default function Layout() {
   const host = JSON.parse(localStorage.getItem('animplay_host') || '{}');
 
   useEffect(() => onAuthStateChanged(auth, user => {
-    if (!user || user.isAnonymous) navigate('/login', { replace: true });
-    setCheckingAuth(false);
+    void isHostAccount(user).then(isHost => {
+      if (!isHost) navigate('/login', { replace: true });
+      setCheckingAuth(false);
+    }).catch(() => {
+      navigate('/login', { replace: true });
+      setCheckingAuth(false);
+    });
   }), [navigate]);
 
   const handleLogout = async () => {
