@@ -171,7 +171,7 @@ export const api: any = {
     },
     me: async () => {
       const user = await waitForAuth();
-      if (!await isHostAccount(user)) throw new Error('Please register a username.');
+      if (!user || !await isHostAccount(user)) throw new Error('Please register a username.');
       return { host: await syncHost(user) };
     },
   },
