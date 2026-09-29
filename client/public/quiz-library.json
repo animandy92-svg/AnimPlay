@@ -16013,6 +16013,1522 @@
         }
       ],
       "coverImage": "/quiz-media/chart-10.svg"
+    },
+    {
+      "id": 910100,
+      "title": "Flag identification",
+      "description": "A focused 15-question quiz all about flag identification.",
+      "category": "flags",
+      "format": "image",
+      "creator_name": "AnimPlay",
+      "play_count": 0,
+      "status": "published",
+      "source": {
+        "name": "AnimPlay original quiz",
+        "url": "/quiz-sources.html",
+        "license": "CC BY-SA 4.0"
+      },
+      "questions": [
+        {
+          "id": 91010000,
+          "question_text": "Which country has a red circle on a white flag?",
+          "answers": [
+            {
+              "text": "Japan",
+              "color": "red"
+            },
+            {
+              "text": "Canada",
+              "color": "blue"
+            },
+            {
+              "text": "Bangladesh",
+              "color": "yellow"
+            },
+            {
+              "text": "Turkey",
+              "color": "green"
+            }
+          ],
+          "correct_index": 0,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          },
+          "media": {
+            "src": "/quiz-media/jp.png",
+            "alt": "Flag of Japan",
+            "kind": "image",
+            "credit": "Flag images: FlagCDN / Flagpedia",
+            "sourceUrl": "https://flagpedia.net/"
+          }
+        },
+        {
+          "id": 91010001,
+          "question_text": "Which country has a blue, white, and red vertical tricolour?",
+          "answers": [
+            {
+              "text": "Netherlands",
+              "color": "red"
+            },
+            {
+              "text": "France",
+              "color": "blue"
+            },
+            {
+              "text": "Russia",
+              "color": "yellow"
+            },
+            {
+              "text": "Croatia",
+              "color": "green"
+            }
+          ],
+          "correct_index": 1,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          },
+          "media": {
+            "src": "/quiz-media/fr.png",
+            "alt": "Flag of France",
+            "kind": "image",
+            "credit": "Flag images: FlagCDN / Flagpedia",
+            "sourceUrl": "https://flagpedia.net/"
+          }
+        },
+        {
+          "id": 91010002,
+          "question_text": "Which country has a green field with a yellow diamond?",
+          "answers": [
+            {
+              "text": "Argentina",
+              "color": "red"
+            },
+            {
+              "text": "Mexico",
+              "color": "blue"
+            },
+            {
+              "text": "Brazil",
+              "color": "yellow"
+            },
+            {
+              "text": "Portugal",
+              "color": "green"
+            }
+          ],
+          "correct_index": 2,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          },
+          "media": {
+            "src": "/quiz-media/br.png",
+            "alt": "Flag of Brazil",
+            "kind": "image",
+            "credit": "Flag images: FlagCDN / Flagpedia",
+            "sourceUrl": "https://flagpedia.net/"
+          }
+        },
+        {
+          "id": 91010003,
+          "question_text": "Which country has a maple leaf on its flag?",
+          "answers": [
+            {
+              "text": "Lebanon",
+              "color": "red"
+            },
+            {
+              "text": "Denmark",
+              "color": "blue"
+            },
+            {
+              "text": "Austria",
+              "color": "yellow"
+            },
+            {
+              "text": "Canada",
+              "color": "green"
+            }
+          ],
+          "correct_index": 3,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          },
+          "media": {
+            "src": "/quiz-media/ca.png",
+            "alt": "Flag of Canada",
+            "kind": "image",
+            "credit": "Flag images: FlagCDN / Flagpedia",
+            "sourceUrl": "https://flagpedia.net/"
+          }
+        },
+        {
+          "id": 91010004,
+          "question_text": "Which country has green, white, and red vertical stripes?",
+          "answers": [
+            {
+              "text": "Italy",
+              "color": "red"
+            },
+            {
+              "text": "Ireland",
+              "color": "blue"
+            },
+            {
+              "text": "France",
+              "color": "yellow"
+            },
+            {
+              "text": "Hungary",
+              "color": "green"
+            }
+          ],
+          "correct_index": 0,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          },
+          "media": {
+            "src": "/quiz-media/it.png",
+            "alt": "Flag of Italy",
+            "kind": "image",
+            "credit": "Flag images: FlagCDN / Flagpedia",
+            "sourceUrl": "https://flagpedia.net/"
+          }
+        },
+        {
+          "id": 91010005,
+          "question_text": "Which country has a white cross on a red square?",
+          "answers": [
+            {
+              "text": "England",
+              "color": "red"
+            },
+            {
+              "text": "Switzerland",
+              "color": "blue"
+            },
+            {
+              "text": "Georgia",
+              "color": "yellow"
+            },
+            {
+              "text": "Tonga",
+              "color": "green"
+            }
+          ],
+          "correct_index": 1,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          },
+          "media": {
+            "src": "/quiz-media/ch.png",
+            "alt": "Flag of Switzerland",
+            "kind": "image",
+            "credit": "Flag images: FlagCDN / Flagpedia",
+            "sourceUrl": "https://flagpedia.net/"
+          }
+        },
+        {
+          "id": 91010006,
+          "question_text": "Which country has a navy blue wheel on its flag?",
+          "answers": [
+            {
+              "text": "Niger",
+              "color": "red"
+            },
+            {
+              "text": "Bangladesh",
+              "color": "blue"
+            },
+            {
+              "text": "India",
+              "color": "yellow"
+            },
+            {
+              "text": "Pakistan",
+              "color": "green"
+            }
+          ],
+          "correct_index": 2,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          },
+          "media": {
+            "src": "/quiz-media/in.png",
+            "alt": "Flag of India",
+            "kind": "image",
+            "credit": "Flag images: FlagCDN / Flagpedia",
+            "sourceUrl": "https://flagpedia.net/"
+          }
+        },
+        {
+          "id": 91010007,
+          "question_text": "Which country has a Union Jack in its flag?",
+          "answers": [
+            {
+              "text": "Australia",
+              "color": "red"
+            },
+            {
+              "text": "New Zealand",
+              "color": "blue"
+            },
+            {
+              "text": "Fiji",
+              "color": "yellow"
+            },
+            {
+              "text": "United Kingdom",
+              "color": "green"
+            }
+          ],
+          "correct_index": 3,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          },
+          "media": {
+            "src": "/quiz-media/gb.png",
+            "alt": "Flag of United Kingdom",
+            "kind": "image",
+            "credit": "Flag images: FlagCDN / Flagpedia",
+            "sourceUrl": "https://flagpedia.net/"
+          }
+        },
+        {
+          "id": 91010008,
+          "question_text": "Which country has a Y-shaped green band on its flag?",
+          "answers": [
+            {
+              "text": "South Africa",
+              "color": "red"
+            },
+            {
+              "text": "Namibia",
+              "color": "blue"
+            },
+            {
+              "text": "Kenya",
+              "color": "yellow"
+            },
+            {
+              "text": "Zimbabwe",
+              "color": "green"
+            }
+          ],
+          "correct_index": 0,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          },
+          "media": {
+            "src": "/quiz-media/za.png",
+            "alt": "Flag of South Africa",
+            "kind": "image",
+            "credit": "Flag images: FlagCDN / Flagpedia",
+            "sourceUrl": "https://flagpedia.net/"
+          }
+        },
+        {
+          "id": 91010009,
+          "question_text": "Which country has a Union Jack and white stars on its flag?",
+          "answers": [
+            {
+              "text": "Brazil",
+              "color": "red"
+            },
+            {
+              "text": "Australia",
+              "color": "blue"
+            },
+            {
+              "text": "India",
+              "color": "yellow"
+            },
+            {
+              "text": "South Africa",
+              "color": "green"
+            }
+          ],
+          "correct_index": 1,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          },
+          "media": {
+            "src": "/quiz-media/au.png",
+            "alt": "Flag of Australia",
+            "kind": "image",
+            "credit": "Flag images: FlagCDN / Flagpedia",
+            "sourceUrl": "https://flagpedia.net/"
+          }
+        },
+        {
+          "id": 91010010,
+          "question_text": "Which country has a cedar tree on its flag?",
+          "answers": [
+            {
+              "text": "Cyprus",
+              "color": "red"
+            },
+            {
+              "text": "Greece",
+              "color": "blue"
+            },
+            {
+              "text": "Lebanon",
+              "color": "yellow"
+            },
+            {
+              "text": "Jordan",
+              "color": "green"
+            }
+          ],
+          "correct_index": 2,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010011,
+          "question_text": "Which country has a white cross on a blue field?",
+          "answers": [
+            {
+              "text": "Norway",
+              "color": "red"
+            },
+            {
+              "text": "Iceland",
+              "color": "blue"
+            },
+            {
+              "text": "Israel",
+              "color": "yellow"
+            },
+            {
+              "text": "Finland",
+              "color": "green"
+            }
+          ],
+          "correct_index": 3,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010012,
+          "question_text": "Which country has a red dragon on its flag?",
+          "answers": [
+            {
+              "text": "Wales",
+              "color": "red"
+            },
+            {
+              "text": "Scotland",
+              "color": "blue"
+            },
+            {
+              "text": "Ireland",
+              "color": "yellow"
+            },
+            {
+              "text": "Malta",
+              "color": "green"
+            }
+          ],
+          "correct_index": 0,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010013,
+          "question_text": "Which country has a black star on a red, yellow, and green flag?",
+          "answers": [
+            {
+              "text": "Cameroon",
+              "color": "red"
+            },
+            {
+              "text": "Ghana",
+              "color": "blue"
+            },
+            {
+              "text": "Senegal",
+              "color": "yellow"
+            },
+            {
+              "text": "Guinea",
+              "color": "green"
+            }
+          ],
+          "correct_index": 1,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010014,
+          "question_text": "Which country has a red circle between blue stripes?",
+          "answers": [
+            {
+              "text": "Cambodia",
+              "color": "red"
+            },
+            {
+              "text": "Thailand",
+              "color": "blue"
+            },
+            {
+              "text": "Laos",
+              "color": "yellow"
+            },
+            {
+              "text": "Malaysia",
+              "color": "green"
+            }
+          ],
+          "correct_index": 2,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        }
+      ]
+    },
+    {
+      "id": 910101,
+      "title": "Countries & Capitals",
+      "description": "A focused 15-question quiz all about countries & capitals.",
+      "category": "countries-capitals",
+      "format": "text",
+      "creator_name": "AnimPlay",
+      "play_count": 0,
+      "status": "published",
+      "source": {
+        "name": "AnimPlay original quiz",
+        "url": "/quiz-sources.html",
+        "license": "CC BY-SA 4.0"
+      },
+      "questions": [
+        {
+          "id": 91010100,
+          "question_text": "What is the capital of Japan?",
+          "answers": [
+            {
+              "text": "Tokyo",
+              "color": "red"
+            },
+            {
+              "text": "Kyoto",
+              "color": "blue"
+            },
+            {
+              "text": "Osaka",
+              "color": "yellow"
+            },
+            {
+              "text": "Sapporo",
+              "color": "green"
+            }
+          ],
+          "correct_index": 0,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010101,
+          "question_text": "What is the capital of France?",
+          "answers": [
+            {
+              "text": "Lyon",
+              "color": "red"
+            },
+            {
+              "text": "Paris",
+              "color": "blue"
+            },
+            {
+              "text": "Nice",
+              "color": "yellow"
+            },
+            {
+              "text": "Marseille",
+              "color": "green"
+            }
+          ],
+          "correct_index": 1,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010102,
+          "question_text": "What is the capital of Brazil?",
+          "answers": [
+            {
+              "text": "Rio de Janeiro",
+              "color": "red"
+            },
+            {
+              "text": "São Paulo",
+              "color": "blue"
+            },
+            {
+              "text": "Brasília",
+              "color": "yellow"
+            },
+            {
+              "text": "Salvador",
+              "color": "green"
+            }
+          ],
+          "correct_index": 2,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010103,
+          "question_text": "What is the capital of Canada?",
+          "answers": [
+            {
+              "text": "Toronto",
+              "color": "red"
+            },
+            {
+              "text": "Vancouver",
+              "color": "blue"
+            },
+            {
+              "text": "Montreal",
+              "color": "yellow"
+            },
+            {
+              "text": "Ottawa",
+              "color": "green"
+            }
+          ],
+          "correct_index": 3,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010104,
+          "question_text": "What is the capital of Australia?",
+          "answers": [
+            {
+              "text": "Canberra",
+              "color": "red"
+            },
+            {
+              "text": "Sydney",
+              "color": "blue"
+            },
+            {
+              "text": "Melbourne",
+              "color": "yellow"
+            },
+            {
+              "text": "Perth",
+              "color": "green"
+            }
+          ],
+          "correct_index": 0,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010105,
+          "question_text": "What is the capital of Egypt?",
+          "answers": [
+            {
+              "text": "Alexandria",
+              "color": "red"
+            },
+            {
+              "text": "Cairo",
+              "color": "blue"
+            },
+            {
+              "text": "Giza",
+              "color": "yellow"
+            },
+            {
+              "text": "Luxor",
+              "color": "green"
+            }
+          ],
+          "correct_index": 1,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010106,
+          "question_text": "What is the capital of Kenya?",
+          "answers": [
+            {
+              "text": "Mombasa",
+              "color": "red"
+            },
+            {
+              "text": "Kisumu",
+              "color": "blue"
+            },
+            {
+              "text": "Nairobi",
+              "color": "yellow"
+            },
+            {
+              "text": "Nakuru",
+              "color": "green"
+            }
+          ],
+          "correct_index": 2,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010107,
+          "question_text": "What is the capital of Italy?",
+          "answers": [
+            {
+              "text": "Milan",
+              "color": "red"
+            },
+            {
+              "text": "Venice",
+              "color": "blue"
+            },
+            {
+              "text": "Florence",
+              "color": "yellow"
+            },
+            {
+              "text": "Rome",
+              "color": "green"
+            }
+          ],
+          "correct_index": 3,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010108,
+          "question_text": "What is the capital of South Korea?",
+          "answers": [
+            {
+              "text": "Seoul",
+              "color": "red"
+            },
+            {
+              "text": "Busan",
+              "color": "blue"
+            },
+            {
+              "text": "Incheon",
+              "color": "yellow"
+            },
+            {
+              "text": "Daegu",
+              "color": "green"
+            }
+          ],
+          "correct_index": 0,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010109,
+          "question_text": "What is the capital of Argentina?",
+          "answers": [
+            {
+              "text": "Córdoba",
+              "color": "red"
+            },
+            {
+              "text": "Buenos Aires",
+              "color": "blue"
+            },
+            {
+              "text": "Rosario",
+              "color": "yellow"
+            },
+            {
+              "text": "Mendoza",
+              "color": "green"
+            }
+          ],
+          "correct_index": 1,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010110,
+          "question_text": "What is the capital of Thailand?",
+          "answers": [
+            {
+              "text": "Phuket",
+              "color": "red"
+            },
+            {
+              "text": "Chiang Mai",
+              "color": "blue"
+            },
+            {
+              "text": "Bangkok",
+              "color": "yellow"
+            },
+            {
+              "text": "Pattaya",
+              "color": "green"
+            }
+          ],
+          "correct_index": 2,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010111,
+          "question_text": "What is the capital of Norway?",
+          "answers": [
+            {
+              "text": "Bergen",
+              "color": "red"
+            },
+            {
+              "text": "Trondheim",
+              "color": "blue"
+            },
+            {
+              "text": "Stavanger",
+              "color": "yellow"
+            },
+            {
+              "text": "Oslo",
+              "color": "green"
+            }
+          ],
+          "correct_index": 3,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010112,
+          "question_text": "What is the capital of Peru?",
+          "answers": [
+            {
+              "text": "Lima",
+              "color": "red"
+            },
+            {
+              "text": "Cusco",
+              "color": "blue"
+            },
+            {
+              "text": "Arequipa",
+              "color": "yellow"
+            },
+            {
+              "text": "Trujillo",
+              "color": "green"
+            }
+          ],
+          "correct_index": 0,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010113,
+          "question_text": "What is the capital of New Zealand?",
+          "answers": [
+            {
+              "text": "Auckland",
+              "color": "red"
+            },
+            {
+              "text": "Wellington",
+              "color": "blue"
+            },
+            {
+              "text": "Christchurch",
+              "color": "yellow"
+            },
+            {
+              "text": "Hamilton",
+              "color": "green"
+            }
+          ],
+          "correct_index": 1,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010114,
+          "question_text": "What is the capital of Morocco?",
+          "answers": [
+            {
+              "text": "Casablanca",
+              "color": "red"
+            },
+            {
+              "text": "Marrakesh",
+              "color": "blue"
+            },
+            {
+              "text": "Rabat",
+              "color": "yellow"
+            },
+            {
+              "text": "Tangier",
+              "color": "green"
+            }
+          ],
+          "correct_index": 2,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        }
+      ]
+    },
+    {
+      "id": 910102,
+      "title": "Animal kingdom",
+      "description": "A focused 15-question quiz all about animal kingdom.",
+      "category": "animals",
+      "format": "text",
+      "creator_name": "AnimPlay",
+      "play_count": 0,
+      "status": "published",
+      "source": {
+        "name": "AnimPlay original quiz",
+        "url": "/quiz-sources.html",
+        "license": "CC BY-SA 4.0"
+      },
+      "questions": [
+        {
+          "id": 91010200,
+          "question_text": "What is the largest animal on Earth?",
+          "answers": [
+            {
+              "text": "Blue whale",
+              "color": "red"
+            },
+            {
+              "text": "African elephant",
+              "color": "blue"
+            },
+            {
+              "text": "Giraffe",
+              "color": "yellow"
+            },
+            {
+              "text": "Whale shark",
+              "color": "green"
+            }
+          ],
+          "correct_index": 0,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010201,
+          "question_text": "Which mammal lays eggs?",
+          "answers": [
+            {
+              "text": "Koala",
+              "color": "red"
+            },
+            {
+              "text": "Platypus",
+              "color": "blue"
+            },
+            {
+              "text": "Dolphin",
+              "color": "yellow"
+            },
+            {
+              "text": "Bat",
+              "color": "green"
+            }
+          ],
+          "correct_index": 1,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010202,
+          "question_text": "What is a group of lions called?",
+          "answers": [
+            {
+              "text": "A pack",
+              "color": "red"
+            },
+            {
+              "text": "A herd",
+              "color": "blue"
+            },
+            {
+              "text": "A pride",
+              "color": "yellow"
+            },
+            {
+              "text": "A colony",
+              "color": "green"
+            }
+          ],
+          "correct_index": 2,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010203,
+          "question_text": "Which animal is known for changing colour to blend in?",
+          "answers": [
+            {
+              "text": "Meerkat",
+              "color": "red"
+            },
+            {
+              "text": "Otter",
+              "color": "blue"
+            },
+            {
+              "text": "Panda",
+              "color": "yellow"
+            },
+            {
+              "text": "Chameleon",
+              "color": "green"
+            }
+          ],
+          "correct_index": 3,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010204,
+          "question_text": "How many legs does a spider have?",
+          "answers": [
+            {
+              "text": "Eight",
+              "color": "red"
+            },
+            {
+              "text": "Six",
+              "color": "blue"
+            },
+            {
+              "text": "Ten",
+              "color": "yellow"
+            },
+            {
+              "text": "Twelve",
+              "color": "green"
+            }
+          ],
+          "correct_index": 0,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010205,
+          "question_text": "Which bird is famous for mimicking human speech?",
+          "answers": [
+            {
+              "text": "Penguin",
+              "color": "red"
+            },
+            {
+              "text": "Parrot",
+              "color": "blue"
+            },
+            {
+              "text": "Flamingo",
+              "color": "yellow"
+            },
+            {
+              "text": "Ostrich",
+              "color": "green"
+            }
+          ],
+          "correct_index": 1,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010206,
+          "question_text": "What is the fastest land animal?",
+          "answers": [
+            {
+              "text": "Lion",
+              "color": "red"
+            },
+            {
+              "text": "Horse",
+              "color": "blue"
+            },
+            {
+              "text": "Cheetah",
+              "color": "yellow"
+            },
+            {
+              "text": "Greyhound",
+              "color": "green"
+            }
+          ],
+          "correct_index": 2,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010207,
+          "question_text": "Which animal carries its baby in a pouch?",
+          "answers": [
+            {
+              "text": "Panda",
+              "color": "red"
+            },
+            {
+              "text": "Fox",
+              "color": "blue"
+            },
+            {
+              "text": "Lemur",
+              "color": "yellow"
+            },
+            {
+              "text": "Kangaroo",
+              "color": "green"
+            }
+          ],
+          "correct_index": 3,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010208,
+          "question_text": "What do caterpillars become?",
+          "answers": [
+            {
+              "text": "Butterflies or moths",
+              "color": "red"
+            },
+            {
+              "text": "Beetles",
+              "color": "blue"
+            },
+            {
+              "text": "Dragonflies",
+              "color": "yellow"
+            },
+            {
+              "text": "Spiders",
+              "color": "green"
+            }
+          ],
+          "correct_index": 0,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010209,
+          "question_text": "Which ocean animal has three hearts?",
+          "answers": [
+            {
+              "text": "Dolphin",
+              "color": "red"
+            },
+            {
+              "text": "Octopus",
+              "color": "blue"
+            },
+            {
+              "text": "Sea turtle",
+              "color": "yellow"
+            },
+            {
+              "text": "Seahorse",
+              "color": "green"
+            }
+          ],
+          "correct_index": 1,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010210,
+          "question_text": "What is a baby frog called?",
+          "answers": [
+            {
+              "text": "Hatchling",
+              "color": "red"
+            },
+            {
+              "text": "Cub",
+              "color": "blue"
+            },
+            {
+              "text": "Tadpole",
+              "color": "yellow"
+            },
+            {
+              "text": "Nymph",
+              "color": "green"
+            }
+          ],
+          "correct_index": 2,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010211,
+          "question_text": "Which animal is the tallest in the world?",
+          "answers": [
+            {
+              "text": "Ostrich",
+              "color": "red"
+            },
+            {
+              "text": "Camel",
+              "color": "blue"
+            },
+            {
+              "text": "Elephant",
+              "color": "yellow"
+            },
+            {
+              "text": "Giraffe",
+              "color": "green"
+            }
+          ],
+          "correct_index": 3,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010212,
+          "question_text": "What do bees collect from flowers to make honey?",
+          "answers": [
+            {
+              "text": "Nectar",
+              "color": "red"
+            },
+            {
+              "text": "Pollen only",
+              "color": "blue"
+            },
+            {
+              "text": "Sap",
+              "color": "yellow"
+            },
+            {
+              "text": "Seeds",
+              "color": "green"
+            }
+          ],
+          "correct_index": 0,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010213,
+          "question_text": "Which animal is known for building dams?",
+          "answers": [
+            {
+              "text": "Mink",
+              "color": "red"
+            },
+            {
+              "text": "Beaver",
+              "color": "blue"
+            },
+            {
+              "text": "Badger",
+              "color": "yellow"
+            },
+            {
+              "text": "Muskrat",
+              "color": "green"
+            }
+          ],
+          "correct_index": 1,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        },
+        {
+          "id": 91010214,
+          "question_text": "What is the largest living species of penguin?",
+          "answers": [
+            {
+              "text": "King penguin",
+              "color": "red"
+            },
+            {
+              "text": "Gentoo penguin",
+              "color": "blue"
+            },
+            {
+              "text": "Emperor penguin",
+              "color": "yellow"
+            },
+            {
+              "text": "Adélie penguin",
+              "color": "green"
+            }
+          ],
+          "correct_index": 2,
+          "timer_seconds": 30,
+          "points": 1000,
+          "questionType": "multiple_choice",
+          "source": {
+            "name": "AnimPlay original quiz",
+            "url": "/quiz-sources.html",
+            "license": "CC BY-SA 4.0"
+          }
+        }
+      ]
     }
   ]
 }

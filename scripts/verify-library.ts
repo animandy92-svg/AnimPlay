@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { existsSync, writeFileSync } from 'node:fs';
-import { QUIZ_LIBRARY } from '../client/src/data/library';
+import { QUIZ_LIBRARY, QUIZ_LIBRARY_WITH_TOPICS } from '../client/src/data/library';
 assert.equal(QUIZ_LIBRARY.length, 30);
 assert.equal(new Set(QUIZ_LIBRARY.map(q => q.id)).size, 30);
 const imported = new Set<string>();
@@ -28,5 +28,13 @@ for (const quiz of QUIZ_LIBRARY) {
 }
 assert.equal(imported.size, 450);
 assert.equal(questionIds.size, 490);
-writeFileSync('client/public/quiz-library.json', JSON.stringify({ license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/', attribution: 'Open Trivia Database community / PIXELTAIL GAMES LLC; adaptations and visual questions by AnimPlay; flag images via FlagCDN / Flagpedia.', retrievedAt: '2026-09-29', quizzes: QUIZ_LIBRARY }, null, 2) + '\n');
-console.log('PASS: 30 quizzes, 490 questions, 450 unique imported questions, 10 quizzes per format, all answer keys and media paths valid.');
+for (const quiz of QUIZ_LIBRARY_WITH_TOPICS.slice(30)) {
+  assert.equal(quiz.questions.length, 15);
+  assert.ok(quiz.questions.every(q => q.source.name === 'AnimPlay original quiz'));
+  for (const q of quiz.questions) if (q.media) assert.ok(existsSync(`client/public${q.media.src}`), `Missing media ${q.media.src}`);
+}
+const allQuestions = QUIZ_LIBRARY_WITH_TOPICS.flatMap(quiz => quiz.questions);
+assert.equal(new Set(QUIZ_LIBRARY_WITH_TOPICS.map(q => q.id)).size, QUIZ_LIBRARY_WITH_TOPICS.length);
+assert.equal(new Set(allQuestions.map(q => q.id)).size, allQuestions.length);
+writeFileSync('client/public/quiz-library.json', JSON.stringify({ license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/', attribution: 'Open Trivia Database community / PIXELTAIL GAMES LLC; adaptations and visual questions by AnimPlay; flag images via FlagCDN / Flagpedia.', retrievedAt: '2026-09-29', quizzes: QUIZ_LIBRARY_WITH_TOPICS }, null, 2) + '\n');
+console.log('PASS: 33 quizzes, 535 questions, 450 unique imported questions, three focused topics, all answer keys and media paths valid.');

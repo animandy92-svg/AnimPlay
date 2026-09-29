@@ -1,11 +1,11 @@
 # AnimPlay quiz collection
 
-The My Quizzes workspace installs 30 editable quizzes for each signed-in host: ten text-only quizzes with 15 questions, ten picture quizzes with 17 questions, and ten diagram quizzes with 17 questions. The total is 490 questions across ten subjects.
+The My Quizzes workspace installs 33 editable quizzes for each signed-in host: the original 30 themed rounds plus focused Flags, Countries & Capitals, and Animals quizzes with 15 questions each (535 questions total). Existing hosts receive the three focused quizzes through a separate one-time marker that preserves existing work.
 
 ## Content and provenance
 
 - `client/src/data/internet-questions.json`: 450 distinct questions imported from Open Trivia Database on September 29, 2026 (CC BY-SA 4.0).
-- `client/src/data/library.ts`: deterministic quiz IDs, shuffled answer positions, source metadata, and 40 original visual questions.
+- `client/src/data/library.ts`: deterministic quiz IDs, shuffled answer positions, source metadata, and 40 original visual questions and 45 original focused-category questions.
 - `client/public/quiz-media`: ten FlagCDN national flag PNGs and ten original SVG survey charts. Survey data is fictional.
 - `client/public/quiz-sources.html`: visible source and licensing information.
 - `client/public/quiz-library.json`: downloadable adapted collection, also CC BY-SA 4.0.

@@ -272,6 +272,9 @@ textarea:focus-visible, summary:focus-visible { outline: 3px solid #a78bfa; outl
 .pill { display: inline-block; color: #8663aa; font-size: 9px; letter-spacing: 1.4px; font-weight: 900; margin-bottom: 6px; }
 .library-banner h2 { font-size: 23px; font-weight: 900; letter-spacing: -.5px; color: #493560; }
 .library-banner p { font-size: 12px; margin-top: 6px; color: #857092; line-height: 1.65; }
+.quiz-category-nav { display: flex; flex-wrap: wrap; gap: 9px; margin: 0 0 22px; }
+.quiz-category-nav button { padding: 9px 14px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: #756983; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.quiz-category-nav button:hover, .quiz-category-nav button.selected { background: #7651d4; border-color: #7651d4; color: #fff; }
 .banner-stats { display: flex; flex-direction: column; text-align: center; margin-left: auto; padding-left: 25px; border-left: 1px solid #dacfe9; flex-shrink: 0; }
 .banner-stats strong { font-size: 29px; font-weight: 900; color: #79559b; }
 .banner-stats span { font-size: 10px; color: #92799f; margin-top: 1px; }

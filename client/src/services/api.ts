@@ -1,4 +1,4 @@
-import { QUIZ_LIBRARY } from '../data/library';
+import { QUIZ_LIBRARY_WITH_TOPICS } from '../data/library';
 import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
@@ -95,7 +95,7 @@ function normalizeQuiz(id: number, raw: AnyRecord): AnyRecord {
   };
 }
 
-const STARTER_QUIZZES = QUIZ_LIBRARY;
+const STARTER_QUIZZES = QUIZ_LIBRARY_WITH_TOPICS;
 // Atomic marker + deterministic IDs make installation safe across tabs and retries.
 // A permanent deletion stays deleted; the collection is only installed once per user.
 const libraryInstalls = new Map<string, Promise<void>>();
@@ -103,16 +103,31 @@ async function ensureLibrary(uid: string) {
   if (!libraryInstalls.has(uid)) {
     const install = runTransaction(db, async transaction => {
       const marker = doc(db, 'users', uid, 'settings', 'quiz-library-v1');
-      if ((await transaction.get(marker)).exists()) return;
+      const topicsMarker = doc(db, 'users', uid, 'settings', 'quiz-topics-v1');
+      const topicQuizzes = QUIZ_LIBRARY_WITH_TOPICS.slice(30);
+      const [libraryInstalled, topicsInstalled, ...topicSnapshots] = await Promise.all([
+        transaction.get(marker), transaction.get(topicsMarker),
+        ...topicQuizzes.map(quiz => transaction.get(doc(db, 'users', uid, 'quizzes', String(quiz.id)))),
+      ]);
       const timestamp = now();
-      for (const quiz of QUIZ_LIBRARY) {
+      if (!libraryInstalled.exists()) for (const quiz of QUIZ_LIBRARY_WITH_TOPICS.slice(0, 30)) {
         transaction.set(doc(db, 'users', uid, 'quizzes', String(quiz.id)), {
           ...quiz, ownerUid: uid, creatorName: quiz.creator_name, isPublic: false,
           isFavorite: false, folderId: null, deletedAt: null, playCount: 0,
           createdAt: timestamp, updatedAt: timestamp,
         });
       }
-      transaction.set(marker, { installedAt: timestamp, count: QUIZ_LIBRARY.length });
+      if (!topicsInstalled.exists()) {
+        topicQuizzes.forEach((quiz, index) => {
+          if (!topicSnapshots[index].exists()) transaction.set(doc(db, 'users', uid, 'quizzes', String(quiz.id)), {
+            ...quiz, ownerUid: uid, creatorName: quiz.creator_name, isPublic: false,
+            isFavorite: false, folderId: null, deletedAt: null, playCount: 0,
+            createdAt: timestamp, updatedAt: timestamp,
+          });
+        });
+        transaction.set(topicsMarker, { installedAt: timestamp, count: 3 });
+      }
+      if (!libraryInstalled.exists()) transaction.set(marker, { installedAt: timestamp, count: 30 });
     }).catch(error => { libraryInstalls.delete(uid); throw error; });
     libraryInstalls.set(uid, install);
   }
@@ -337,7 +352,7 @@ export const api: any = {
     },
   },
   discover: {
-    categories: async () => ({ categories: [...new Set(QUIZ_LIBRARY.map(q => q.category))] }),
+    categories: async () => ({ categories: [...new Set(STARTER_QUIZZES.map(q => q.category))] }),
     quizzes: async ({ search = '', category = 'all', sort = 'popular' }: AnyRecord) => {
       const term = search.trim().toLowerCase();
       let quizzes = STARTER_QUIZZES.map(item => ({ ...item, question_count: item.questions.length }));

@@ -59,7 +59,7 @@ export default function Discover() {
 
   return (
     <div className="section-page">
-      <h1 className="font-display text-4xl text-animplay-brand mb-6">Discover Quizzes</h1><p className="section-description">Find your next crowd-pleaser. Explore 30 curated quizzes across ten subjects.</p>
+      <h1 className="font-display text-4xl text-animplay-brand mb-6">Discover Quizzes</h1><p className="section-description">Find your next crowd-pleaser. Explore focused categories like Flags, Countries & Capitals, and Animals.</p>
 
       <form onSubmit={handleSearch} className="flex gap-3 mb-6">
         <input
