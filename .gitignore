@@ -26,3 +26,7 @@ npm-debug.log*
 .DS_Store
 .idea/
 .vscode/
+
+# Versioned quiz content (the legacy data directory remains ignored).
+!client/src/data/
+!client/src/data/**

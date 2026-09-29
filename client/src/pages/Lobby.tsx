@@ -84,7 +84,7 @@ export default function Lobby() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-animplay-blue to-animplay-purple flex items-center justify-center">
         <div className="text-center animate-bounce-in">
-          <h1 className="font-display text-6xl text-white mb-4">Game Starting!</h1>
+          <h1 className="font-display text-4xl sm:text-6xl text-white mb-4">Game Starting!</h1>
           <p className="text-white/80 text-2xl">{totalQuestions} questions</p>
         </div>
       </div>
@@ -92,9 +92,9 @@ export default function Lobby() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-animplay-purple to-animplay-purple-dark flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen home-shell flex flex-col items-center justify-center p-4">
       <div className="text-center mb-8">
-        <h1 className="font-display text-5xl text-white mb-4">Lobby</h1>
+        <h1 className="font-display text-4xl sm:text-5xl text-white mb-4">Lobby</h1>
         <p className="text-white/80 text-xl">
           Welcome, <span className="font-bold text-white">{nickname}</span>!
         </p>

@@ -1,9 +1,12 @@
+import QuestionMedia from '../components/QuestionMedia';
+import type { QuestionMedia as Media } from '../data/library';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 import type { QuestionType, PowerUp as IPowerUp, ChatMessage as IChatMessage } from '@shared/types';
 
 interface QuestionData {
+  media?: Media;
   questionId: number;
   questionText: string;
   answers: { text: string; color: string }[];
@@ -191,7 +194,7 @@ export default function PlayerGame() {
 
   if (phase === 'countdown') {
     return (
-      <div className="min-h-screen bg-animplay-purple flex items-center justify-center">
+      <div className="min-h-screen home-shell flex items-center justify-center">
         <div className="text-center">
           <div className="font-display text-9xl text-white animate-bounce-in">
             {question ? question.questionIndex + 1 : '?'}
@@ -212,7 +215,7 @@ export default function PlayerGame() {
     const visibleShapes = ANSWER_SHAPES.slice(0, question.answerCount);
 
     return (
-      <div className="min-h-screen bg-animplay-purple p-4 flex flex-col">
+      <div className="min-h-screen home-shell p-4 flex flex-col">
         <div className="flex justify-between items-center mb-4">
           <div className="text-white/80 font-bold">
             {question.questionIndex + 1} / {question.totalQuestions}
@@ -234,6 +237,7 @@ export default function PlayerGame() {
             <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
               {question.questionType === 'open_ended' ? 'Type your answer below!' : question.questionText}
             </h2>
+            <QuestionMedia media={question.media} />
             {question.questionType === 'open_ended' && (
               <div>
                 <input
@@ -322,7 +326,7 @@ export default function PlayerGame() {
 
   if (phase === 'results' || phase === 'leaderboard') {
     return (
-      <div className="min-h-screen bg-animplay-purple flex items-center justify-center p-4">
+      <div className="min-h-screen home-shell flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl p-8 shadow-2xl w-full max-w-md text-center animate-bounce-in">
           <div className="text-6xl mb-4">
             {isCorrect === true ? '✅' : isCorrect === false ? '❌' : '⏳'}

@@ -27,7 +27,7 @@ export default function Register() {
 
   return (
     <div className="relative min-h-screen overflow-hidden flex flex-col items-center justify-center px-4 pb-8 pt-28 sm:pt-32">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#512da8] via-[#9c27b0] via-[30%] via-[#ff1744] via-[60%] to-[#3f51b5] bg-[length:400%_400%] animate-gradient-bg" />
+      <div className="absolute inset-0 home-shell" />
 
       <nav className="absolute inset-x-0 top-0 z-20 mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-6 md:px-8">
         <Link to="/" className="flex items-center gap-3" aria-label="AnimPlay home">

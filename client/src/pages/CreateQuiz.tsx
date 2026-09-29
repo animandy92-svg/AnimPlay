@@ -1,5 +1,7 @@
+import QuestionMedia from '../components/QuestionMedia';
+import type { QuestionMedia as Media } from '../data/library';
 import { useEffect, useState, useCallback } from 'react';
-import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import type { QuestionType } from '@shared/types';
 
@@ -9,6 +11,9 @@ interface AnswerOption {
 }
 
 interface QuestionForm {
+  id?: number;
+  media?: Media;
+  source?: { name: string; url: string; license: string };
   question_text: string;
   timer_seconds: number;
   points: number;
@@ -24,37 +29,6 @@ const QUESTION_TYPES: { value: QuestionType; label: string }[] = [
   { value: 'true_false', label: 'True / False' },
   { value: 'open_ended', label: 'Open Ended' },
 ];
-
-const SAMPLE_QUIZ: { title: string; description: string; questions: QuestionForm[] } = {
-  title: 'General Knowledge Trivia',
-  description: 'A quick test of random facts.',
-  questions: [
-    {
-      question_text: 'What is the capital of Japan?',
-      timer_seconds: 20,
-      points: 1000,
-      correct_index: 2,
-      answers: [
-        { text: 'Kyoto', color: 'red' },
-        { text: 'Osaka', color: 'blue' },
-        { text: 'Tokyo', color: 'yellow' },
-        { text: 'Seoul', color: 'green' },
-      ],
-      questionType: 'multiple_choice',
-    },
-    {
-      question_text: 'The Great Wall of China is visible from space with the naked eye.',
-      timer_seconds: 10,
-      points: 2000,
-      correct_index: 1,
-      answers: [
-        { text: 'True', color: 'red' },
-        { text: 'False', color: 'blue' },
-      ],
-      questionType: 'true_false',
-    },
-  ],
-};
 
 export default function CreateQuiz() {
   const { id } = useParams();
@@ -78,8 +52,9 @@ export default function CreateQuiz() {
     questionType: 'multiple_choice',
   });
   const [saving, setSaving] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showAddForm, setShowAddForm] = useState(true);
-  const [searchParams] = useSearchParams();
+
 
   const loadQuiz = useCallback(async () => {
     if (!id) return;
@@ -88,6 +63,7 @@ export default function CreateQuiz() {
       setTitle(data.quiz.title);
       setDescription(data.quiz.description);
       setQuestions(data.quiz.questions.map((q: any) => ({
+        id: q.id, media: q.media, source: q.source,
         question_text: q.question_text,
         timer_seconds: q.timer_seconds,
         points: q.points,
@@ -101,23 +77,7 @@ export default function CreateQuiz() {
     }
   }, [id, navigate]);
 
-  const loadSampleQuiz = () => {
-    setTitle(SAMPLE_QUIZ.title);
-    setDescription(SAMPLE_QUIZ.description);
-    setQuestions(SAMPLE_QUIZ.questions);
-    setShowAddForm(false);
-  };
-
-  useEffect(() => {
-    if (isEditing) {
-      loadQuiz();
-      return;
-    }
-
-    if (searchParams.get('sample') === 'true') {
-      loadSampleQuiz();
-    }
-  }, [id, isEditing, loadQuiz, searchParams]);
+  useEffect(() => { if (isEditing) void loadQuiz(); }, [isEditing, loadQuiz]);
 
   const handleAddQuestion = () => {
     if (!currentQ.question_text.trim()) {
@@ -130,10 +90,17 @@ export default function CreateQuiz() {
       return;
     }
 
-    setQuestions([...questions, {
+    if (currentQ.questionType !== 'open_ended' && !currentQ.answers[currentQ.correct_index]?.text.trim()) {
+      alert('The selected correct answer cannot be empty.'); return;
+    }
+    const correctText = currentQ.answers[currentQ.correct_index]?.text;
+    const nextQuestion = {
       ...currentQ,
       answers: currentQ.questionType === 'open_ended' ? [] : validAnswers,
-    }]);
+      correct_index: currentQ.questionType === 'open_ended' ? 0 : validAnswers.findIndex(a => a.text === correctText),
+    };
+    setQuestions(editingIndex === null ? [...questions, nextQuestion] : questions.map((q,i) => i === editingIndex ? nextQuestion : q));
+    setEditingIndex(null);
     setCurrentQ({
       question_text: '',
       timer_seconds: 20,
@@ -150,6 +117,7 @@ export default function CreateQuiz() {
   };
 
   const handleRemoveQuestion = (index: number) => {
+    if (editingIndex !== null) { alert('Finish editing the current question first.'); return; }
     setQuestions(questions.filter((_, i) => i !== index));
   };
 
@@ -191,6 +159,7 @@ export default function CreateQuiz() {
       alert('Please enter a quiz title');
       return;
     }
+    if (editingIndex !== null || currentQ.question_text.trim()) { alert('Add or update the question in the form before saving the quiz.'); return; }
     if (questions.length === 0) {
       alert('Please add at least one question');
       return;
@@ -198,29 +167,7 @@ export default function CreateQuiz() {
 
     setSaving(true);
     try {
-      let quizId = id ? Number(id) : null;
-
-      if (!isEditing) {
-        const quizData = await api.quizzes.create(title, description);
-        quizId = quizData.quiz.id;
-      } else {
-        await api.quizzes.update(quizId!, { title, description });
-        const existing = await api.quizzes.get(quizId!);
-        for (const q of existing.quiz.questions) {
-          await api.quizzes.deleteQuestion(quizId!, q.id);
-        }
-      }
-
-      for (const q of questions) {
-        await api.quizzes.addQuestion(quizId!, {
-          question_text: q.question_text,
-          timer_seconds: q.timer_seconds,
-          points: q.points,
-          correct_index: q.correct_index,
-          questionType: q.questionType,
-          answers: q.answers.filter(a => a.text.trim()),
-        });
-      }
+      await api.quizzes.save(id ? Number(id) : null, title, description, questions);
 
       navigate('/dashboard');
     } catch (err: any) {
@@ -238,9 +185,9 @@ export default function CreateQuiz() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-animplay-purple text-white p-4 shadow-lg">
+      <header className="editor-toolbar">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <Link to="/dashboard" className="font-display text-3xl">AnimPlay</Link>
+          <Link to="/dashboard">← My Quizzes / {isEditing ? 'Edit quiz' : 'Create quiz'}</Link>
           <button
             onClick={handleSave}
             disabled={saving}
@@ -260,24 +207,18 @@ export default function CreateQuiz() {
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Quiz Title"
+                aria-label="Quiz title" placeholder="Quiz Title"
                 className="w-full text-2xl font-bold border-b-2 border-gray-200 py-2 mb-3 focus:border-animplay-purple focus:outline-none"
               />
               <input
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Description (optional)"
+                aria-label="Quiz description" placeholder="Description (optional)"
                 className="w-full text-gray-500 border-b border-gray-200 py-2 focus:border-animplay-purple focus:outline-none"
               />
             </div>
-            <button
-              type="button"
-              onClick={loadSampleQuiz}
-              className="rounded-xl bg-animplay-purple text-white px-5 py-3 font-semibold shadow hover:bg-animplay-purple-dark transition-colors"
-            >
-              Load Sample Quiz
-            </button>
+
           </div>
         </div>
 
@@ -285,16 +226,19 @@ export default function CreateQuiz() {
           <div className="mb-6">
             <h2 className="font-display text-xl text-gray-700 mb-3">Questions ({questions.length})</h2>
             {questions.map((q, i) => (
-              <div key={i} className="bg-white rounded-xl p-4 shadow mb-3 flex items-center gap-4">
+              <div key={i} className="bg-white rounded-xl p-4 shadow mb-3 flex flex-wrap sm:flex-nowrap items-start gap-4">
                 <div className="bg-animplay-purple text-white w-10 h-10 rounded-full flex items-center justify-center font-bold">
                   {i + 1}
                 </div>
                 <div className="flex-1">
                   <div className="font-bold text-gray-800">{q.question_text}</div>
+                  <QuestionMedia media={q.media} />
+                  <details className="mt-2 text-sm text-gray-500"><summary>Review answers</summary>{q.answers.map((a,j) => <p key={j} className={j === q.correct_index ? 'text-green-700 font-bold' : ''}>{j === q.correct_index ? '✓ ' : ''}{a.text}</p>)}</details>
                   <div className="text-sm text-gray-400">
                     {q.timer_seconds}s · {q.points} pts · {q.answers.filter(a => a.text).length} answers · {q.questionType}
                   </div>
                 </div>
+                <button className="text-animplay-purple font-bold text-sm" onClick={() => { setCurrentQ({ ...q, answers: q.answers.map(a => ({ ...a })) }); setEditingIndex(i); document.getElementById('question-editor')?.scrollIntoView({ behavior: 'smooth' }); }}>Edit</button>
                 <button
                   onClick={() => handleRemoveQuestion(i)}
                   className="text-animplay-red hover:text-red-700 font-bold"
@@ -307,18 +251,19 @@ export default function CreateQuiz() {
         )}
 
         {showAddForm && (
-          <div className="bg-white rounded-2xl p-6 shadow">
+          <div id="question-editor" className="bg-white rounded-2xl p-6 shadow">
             <h2 className="font-display text-xl text-gray-700 mb-4">
-              Add Question #{questions.length + 1}
+              {editingIndex === null ? `Add question #${questions.length + 1}` : `Edit question #${editingIndex + 1}`}
             </h2>
 
+            <QuestionMedia media={currentQ.media} />
             <div className="mb-4">
               <input
                 type="text"
                 value={currentQ.question_text}
                 onChange={(e) => setCurrentQ({ ...currentQ, question_text: e.target.value })}
-                placeholder="Your question (max 120 characters)"
-                maxLength={120}
+                aria-label="Question text" placeholder="Your question"
+                maxLength={500}
                 className="w-full text-lg py-3 px-4 border-2 border-gray-200 rounded-xl focus:border-animplay-purple focus:outline-none"
               />
             </div>
@@ -345,12 +290,12 @@ export default function CreateQuiz() {
                       type="text"
                       value={answer.text}
                       onChange={(e) => updateAnswer(i, e.target.value)}
-                      placeholder={`Answer ${i + 1}`}
-                      className="flex-1 py-2 px-3 border-2 border-gray-200 rounded-lg focus:border-animplay-purple focus:outline-none"
+                      aria-label={`Answer ${i + 1}`} placeholder={`Answer ${i + 1}`}
+                      className="flex-1 min-w-0 py-2 px-3 border-2 border-gray-200 rounded-lg focus:border-animplay-purple focus:outline-none"
                     />
                     <input
                       type="radio"
-                      name="correct"
+                      name="correct" aria-label={`Mark answer ${i + 1} correct`}
                       checked={currentQ.correct_index === i}
                       onChange={() => setCurrentQ({ ...currentQ, correct_index: i })}
                       className="w-5 h-5"
@@ -403,7 +348,7 @@ export default function CreateQuiz() {
               className="bg-animplay-purple text-white font-display text-lg py-3 px-6 rounded-xl
                          hover:bg-animplay-purple-dark transition-colors"
             >
-              Add Question
+              {editingIndex === null ? 'Add question' : 'Update question'}
             </button>
           </div>
         )}

@@ -1,3 +1,4 @@
+import { QUIZ_LIBRARY } from '../data/library';
 import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
@@ -15,6 +16,7 @@ import {
   updateDoc,
   where,
   writeBatch,
+  runTransaction,
 } from 'firebase/firestore';
 import { auth, createUsernameAccount, db, isHostAccount, requireUser, waitForAuth } from './firebase';
 
@@ -28,6 +30,7 @@ function friendlyError(error: any): Error {
   const code = String(error?.code || '');
   const messages: Record<string, string> = {
     'auth/configuration-not-found': 'Sign-in is not configured yet. Please contact the site administrator.',
+    'auth/admin-restricted-operation': 'Guest host accounts are disabled by the Firebase project administrator. Please contact the site administrator to enable account creation.',
     'auth/operation-not-allowed': 'This sign-in method is not enabled. Please contact the site administrator.',
     'auth/email-already-in-use': 'An account already exists for that email.',
     'auth/invalid-credential': 'The email or password is incorrect.',
@@ -86,51 +89,39 @@ function normalizeQuiz(id: number, raw: AnyRecord): AnyRecord {
       questionType: question.questionType || 'multiple_choice',
       sortOrder: question.sortOrder ?? index,
       answers: question.answers || [],
+      ...(question.media ? { media: question.media } : {}),
+      ...(question.source ? { source: question.source } : {}),
     })),
   };
 }
 
-const STARTER_QUIZZES = [
-  {
-    id: 900001,
-    title: 'Around the World',
-    description: 'A colorful trip through capitals, landmarks, and cultures.',
-    category: 'general',
-    creator_name: 'AnimPlay Studio',
-    play_count: 2480,
-    questions: [
-      { id: 1, question_text: 'What is the capital of Japan?', timer_seconds: 20, points: 1000, correct_index: 2, questionType: 'multiple_choice', answers: [{ text: 'Kyoto', color: 'red' }, { text: 'Osaka', color: 'blue' }, { text: 'Tokyo', color: 'yellow' }, { text: 'Seoul', color: 'green' }] },
-      { id: 2, question_text: 'Which continent is Kenya in?', timer_seconds: 20, points: 1000, correct_index: 1, questionType: 'multiple_choice', answers: [{ text: 'Asia', color: 'red' }, { text: 'Africa', color: 'blue' }, { text: 'Europe', color: 'yellow' }, { text: 'South America', color: 'green' }] },
-    ],
-  },
-  {
-    id: 900002,
-    title: 'Science Sparks',
-    description: 'Fast, friendly science questions for curious minds.',
-    category: 'science',
-    creator_name: 'AnimPlay Studio',
-    play_count: 1934,
-    questions: [
-      { id: 1, question_text: 'Which planet is known as the Red Planet?', timer_seconds: 20, points: 1000, correct_index: 0, questionType: 'multiple_choice', answers: [{ text: 'Mars', color: 'red' }, { text: 'Venus', color: 'blue' }, { text: 'Jupiter', color: 'yellow' }, { text: 'Mercury', color: 'green' }] },
-      { id: 2, question_text: 'Plants absorb carbon dioxide from the air.', timer_seconds: 10, points: 1000, correct_index: 0, questionType: 'true_false', answers: [{ text: 'True', color: 'red' }, { text: 'False', color: 'blue' }] },
-    ],
-  },
-  {
-    id: 900003,
-    title: 'Animal Superpowers',
-    description: 'Discover the wild abilities of animals big and small.',
-    category: 'animals',
-    creator_name: 'AnimPlay Studio',
-    play_count: 3217,
-    questions: [
-      { id: 1, question_text: 'Which animal is the fastest on land?', timer_seconds: 15, points: 1000, correct_index: 3, questionType: 'multiple_choice', answers: [{ text: 'Lion', color: 'red' }, { text: 'Horse', color: 'blue' }, { text: 'Ostrich', color: 'yellow' }, { text: 'Cheetah', color: 'green' }] },
-      { id: 2, question_text: 'How many hearts does an octopus have?', timer_seconds: 20, points: 1000, correct_index: 2, questionType: 'multiple_choice', answers: [{ text: 'One', color: 'red' }, { text: 'Two', color: 'blue' }, { text: 'Three', color: 'yellow' }, { text: 'Four', color: 'green' }] },
-    ],
-  },
-];
+const STARTER_QUIZZES = QUIZ_LIBRARY;
+// Atomic marker + deterministic IDs make installation safe across tabs and retries.
+// A permanent deletion stays deleted; the collection is only installed once per user.
+const libraryInstalls = new Map<string, Promise<void>>();
+async function ensureLibrary(uid: string) {
+  if (!libraryInstalls.has(uid)) {
+    const install = runTransaction(db, async transaction => {
+      const marker = doc(db, 'users', uid, 'settings', 'quiz-library-v1');
+      if ((await transaction.get(marker)).exists()) return;
+      const timestamp = now();
+      for (const quiz of QUIZ_LIBRARY) {
+        transaction.set(doc(db, 'users', uid, 'quizzes', String(quiz.id)), {
+          ...quiz, ownerUid: uid, creatorName: quiz.creator_name, isPublic: false,
+          isFavorite: false, folderId: null, deletedAt: null, playCount: 0,
+          createdAt: timestamp, updatedAt: timestamp,
+        });
+      }
+      transaction.set(marker, { installedAt: timestamp, count: QUIZ_LIBRARY.length });
+    }).catch(error => { libraryInstalls.delete(uid); throw error; });
+    libraryInstalls.set(uid, install);
+  }
+  await libraryInstalls.get(uid);
+}
 
 async function getOwnedQuiz(id: number) {
   const user = await userContext();
+  await ensureLibrary(user.uid);
   const ref = doc(db, 'users', user.uid, 'quizzes', String(id));
   const snap = await getDoc(ref);
   if (!snap.exists()) throw new Error('Quiz not found.');
@@ -176,8 +167,28 @@ export const api: any = {
     },
   },
   quizzes: {
+    save: async (id: number | null, title: string, description: string, questions: AnyRecord[]) => {
+      const user = await userContext();
+      const timestamp = now();
+      const nextId = id || makeId();
+      const cleanQuestions = questions.map((q, index) => JSON.parse(JSON.stringify({ ...q, id: q.id || makeId() + index, sortOrder: index })));
+      const format = cleanQuestions.some(q => q.media?.kind === 'diagram') ? 'diagram' : cleanQuestions.some(q => q.media) ? 'image' : 'text';
+      const changes = { title: title.trim(), description: description.trim(), questions: cleanQuestions, format, status: 'published', updatedAt: timestamp };
+      if (id) {
+        const { ref } = await getOwnedQuiz(id);
+        await updateDoc(ref, changes);
+      } else {
+        await setDoc(doc(db, 'users', user.uid, 'quizzes', String(nextId)), {
+          ...changes, id: nextId, ownerUid: user.uid, creatorName: user.displayName || 'Host',
+          category: 'general', isPublic: false, isFavorite: false, folderId: null,
+          deletedAt: null, playCount: 0, createdAt: timestamp,
+        });
+      }
+      return { quiz: { id: nextId } };
+    },
     list: async (tab = 'recent', folderId?: number) => {
       const user = await userContext();
+      await ensureLibrary(user.uid);
       const snapshots = await getDocs(collection(db, 'users', user.uid, 'quizzes'));
       let quizzes = snapshots.docs.map(item => normalizeQuiz(Number(item.id), item.data()));
       quizzes = quizzes.filter(item => {
@@ -258,6 +269,8 @@ export const api: any = {
         timer_seconds: Number(question.timer_seconds) || 20, points: Number(question.points) || 0,
         correct_index: Number(question.correct_index) || 0, questionType: question.questionType || 'multiple_choice',
         answers: question.questionType === 'open_ended' ? [] : question.answers, sortOrder: questions.length,
+        ...(question.media ? { media: question.media } : {}),
+        ...(question.source ? { source: question.source } : {}),
       };
       await updateDoc(ref, { questions: [...questions, next], updatedAt: now() });
       return { question: { id: next.id } };
@@ -324,7 +337,7 @@ export const api: any = {
     },
   },
   discover: {
-    categories: async () => ({ categories: ['general', 'science', 'animals', 'trivia', 'sports', 'language'] }),
+    categories: async () => ({ categories: [...new Set(QUIZ_LIBRARY.map(q => q.category))] }),
     quizzes: async ({ search = '', category = 'all', sort = 'popular' }: AnyRecord) => {
       const term = search.trim().toLowerCase();
       let quizzes = STARTER_QUIZZES.map(item => ({ ...item, question_count: item.questions.length }));

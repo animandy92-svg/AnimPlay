@@ -236,6 +236,7 @@ export class FirebaseGameSocket {
     return {
       questionId: question.id,
       questionText: question.question_text,
+      media: question.media || null,
       answers: question.answers || [],
       answerCount: question.answers?.length || 0,
       timer: question.timer_seconds,

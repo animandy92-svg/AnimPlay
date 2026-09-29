@@ -42,8 +42,8 @@ export default function Reports() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="font-display text-4xl text-animplay-brand mb-6">Game Reports</h1>
+    <div className="section-page">
+      <h1 className="font-display text-4xl text-animplay-brand mb-6">Game Reports</h1><p className="section-description">Every game tells a story. Revisit results and celebrate progress.</p>
 
       {loading ? (
         <div className="text-center py-12 text-gray-500">Loading...</div>
@@ -54,7 +54,7 @@ export default function Reports() {
           <p className="text-gray-500">Finished games will appear here</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow overflow-hidden">
+        <div className="bg-white rounded-2xl shadow overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>

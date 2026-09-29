@@ -97,9 +97,9 @@ export default function JoinGame() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-animplay-purple to-animplay-purple-dark flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen home-shell flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <h1 className="font-display text-5xl text-white text-center mb-8">
+        <h1 className="font-display text-4xl sm:text-5xl text-white text-center mb-8">
           Join Game
         </h1>
 

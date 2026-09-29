@@ -1,9 +1,12 @@
+import QuestionMedia from '../components/QuestionMedia';
+import type { QuestionMedia as Media } from '../data/library';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 import type { QuestionType, ChatMessage as IChatMessage, LeaderboardEntry } from '@shared/types';
 
 interface QuestionData {
+  media?: Media;
   questionId: number;
   questionText: string;
   answers: { text: string; color: string }[];
@@ -151,7 +154,7 @@ export default function HostGame() {
   if (phase === 'question') {
     if (!question) {
       return (
-        <div className="min-h-screen bg-animplay-purple flex items-center justify-center">
+        <div className="min-h-screen home-shell flex items-center justify-center">
           <div className="text-white text-2xl font-bold">Loading question data...</div>
         </div>
       );
@@ -160,7 +163,7 @@ export default function HostGame() {
     const timerPercent = (timeLeft / question.timer) * 100;
 
     return (
-      <div className="min-h-screen bg-animplay-purple flex flex-col">
+      <div className="min-h-screen home-shell flex flex-col">
         <div className="bg-animplay-purple-dark p-4 flex justify-between items-center">
           <div className="text-white/80 font-bold">
             Question {question.questionIndex + 1} of {question.totalQuestions}
@@ -177,11 +180,12 @@ export default function HostGame() {
           />
         </div>
 
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="bg-white rounded-3xl p-10 shadow-2xl w-full max-w-3xl text-center">
-            <h2 className="text-3xl md:text-5xl font-bold text-gray-800">
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-8">
+          <div className="bg-white rounded-3xl p-5 sm:p-10 shadow-2xl w-full max-w-3xl text-center">
+            <h2 className="text-2xl md:text-4xl font-bold text-gray-800">
               {question.questionText}
             </h2>
+            <QuestionMedia media={question.media} />
             {question.questionType === 'open_ended' && (
               <p className="mt-4 text-animplay-brand font-bold">Open-ended - Judge answers manually</p>
             )}
@@ -234,14 +238,14 @@ export default function HostGame() {
   if (phase === 'results' || phase === 'leaderboard') {
     if (!question) {
       return (
-        <div className="min-h-screen bg-animplay-purple flex items-center justify-center">
+        <div className="min-h-screen home-shell flex items-center justify-center">
           <div className="text-white text-2xl font-bold">Loading results...</div>
         </div>
       );
     }
 
     return (
-      <div className="min-h-screen bg-animplay-purple flex flex-col items-center justify-center p-8">
+      <div className="min-h-screen home-shell flex flex-col items-center justify-center p-8">
         <div className="bg-white rounded-3xl p-10 shadow-2xl w-full max-w-3xl mb-8">
           <h2 className="font-display text-4xl text-center mb-6 text-gray-800">Results</h2>
 
@@ -301,8 +305,8 @@ export default function HostGame() {
 
   if (phase === 'finished') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-animplay-purple to-animplay-purple-dark flex flex-col items-center justify-center p-4">
-        <h1 className="font-display text-6xl text-white mb-8">Game Over!</h1>
+      <div className="min-h-screen home-shell flex flex-col items-center justify-center p-4">
+        <h1 className="font-display text-4xl sm:text-6xl text-white mb-8">Game Over!</h1>
 
         {leaderboard.length > 0 && (
           <div className="bg-white rounded-3xl p-8 shadow-2xl w-full max-w-md mb-8">

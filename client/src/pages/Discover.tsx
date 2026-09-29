@@ -58,8 +58,8 @@ export default function Discover() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="font-display text-4xl text-animplay-brand mb-6">Discover Quizzes</h1>
+    <div className="section-page">
+      <h1 className="font-display text-4xl text-animplay-brand mb-6">Discover Quizzes</h1><p className="section-description">Find your next crowd-pleaser. Explore 30 curated quizzes across ten subjects.</p>
 
       <form onSubmit={handleSearch} className="flex gap-3 mb-6">
         <input
@@ -138,7 +138,7 @@ export default function Discover() {
               <p className="text-gray-500 text-sm mb-3">{quiz.description || 'No description'}</p>
               <div className="text-xs text-gray-400 mb-4 flex gap-4">
                 <span>{quiz.question_count} questions</span>
-                <span>{quiz.play_count} plays</span>
+                <span>Ready to host</span>
                 <span>by {quiz.creator_name}</span>
               </div>
               <button

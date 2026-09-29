@@ -2,124 +2,52 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, isHostAccount } from '../services/firebase';
-
+import Icon from './Icon';
 const NAV_ITEMS = [
-  { path: '/dashboard', label: 'My Quizzes', icon: '📝' },
-  { path: '/discover', label: 'Discover', icon: '🔍' },
-  { path: '/groups', label: 'Groups', icon: '👥' },
-  { path: '/assignments', label: 'Assignments', icon: '📋' },
-  { path: '/reports', label: 'Reports', icon: '📊' },
+  { path: '/dashboard', label: 'My Quizzes', icon: 'quizzes' },
+  { path: '/discover', label: 'Discover', icon: 'discover' },
+  { path: '/groups', label: 'Groups', icon: 'groups' },
+  { path: '/assignments', label: 'Assignments', icon: 'assignments' },
+  { path: '/reports', label: 'Reports', icon: 'reports' },
 ];
-
 export default function Layout() {
+  const [checking, setChecking] = useState(true);
+  const navigate = useNavigate();
+  useEffect(() => onAuthStateChanged(auth, user => {
+    void isHostAccount(user).then(ok => { if (!ok) navigate('/login', { replace: true }); setChecking(false); }).catch(() => { navigate('/login', { replace: true }); setChecking(false); });
+  }), [navigate]);
+  if (checking) return <div className="loading-space" role="status">Opening your workspace…</div>;
+  return <Workspace username={auth.currentUser?.displayName || 'Quiz host'} onLogout={async () => { await signOut(auth); localStorage.removeItem('animplay_token'); localStorage.removeItem('animplay_host'); navigate('/'); }} />;
+}
+
+export function Workspace({ username, onLogout }: { username: string; onLogout: () => void }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
-  const host = JSON.parse(localStorage.getItem('animplay_host') || '{}');
-
-  useEffect(() => onAuthStateChanged(auth, user => {
-    void isHostAccount(user).then(isHost => {
-      if (!isHost) navigate('/login', { replace: true });
-      setCheckingAuth(false);
-    }).catch(() => {
-      navigate('/login', { replace: true });
-      setCheckingAuth(false);
-    });
-  }), [navigate]);
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    localStorage.removeItem('animplay_token');
-    localStorage.removeItem('animplay_host');
-    navigate('/');
-  };
-
-  if (checkingAuth) {
-    return (
-      <div className="grid min-h-screen place-items-center bg-[#15113a] text-white">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-cyan-300" />
-          <p className="font-bold text-white/70">Loading your space…</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative min-h-screen flex">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#512da8] via-[#9c27b0] via-[30%] via-[#ff1744] via-[60%] to-[#3f51b5] bg-[length:400%_400%] animate-gradient-bg" />
-
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      <aside
-        className={`
-          fixed top-0 left-0 h-full w-64 bg-black/20 backdrop-blur-xl border-r border-white/10 text-white z-40
-          transform transition-transform duration-200 ease-in-out
-          lg:translate-x-0 lg:static lg:z-auto
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        `}
-      >
-        <div className="p-6">
-          <Link to="/" className="font-display text-2xl text-white">AnimPlay</Link>
-        </div>
-
-        <nav className="px-3">
-          {NAV_ITEMS.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={() => setSidebarOpen(false)}
-                className={`
-                  flex items-center gap-3 px-4 py-3 rounded-xl mb-1 text-sm font-bold transition-colors
-                  ${isActive
-                    ? 'bg-white/20 text-white shadow-lg'
-                    : 'text-white/80 hover:bg-white/10 hover:text-white'
-                  }
-                `}
-              >
-                <span className="text-lg">{item.icon}</span>
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
-          <div className="text-white/70 text-xs mb-2 truncate">{host.username}</div>
-          <button
-            onClick={handleLogout}
-            className="text-white/50 hover:text-white text-xs transition-colors"
-          >
-            Logout
-          </button>
-        </div>
-      </aside>
-
-      <div className="relative z-10 flex-1 flex flex-col min-h-screen">
-        <header className="bg-black/10 backdrop-blur-md border-b border-white/10 px-4 py-3 flex items-center gap-4 lg:hidden">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-white/80 hover:text-white"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <Link to="/" className="font-display text-xl text-white">AnimPlay</Link>
-        </header>
-
-        <main className="flex-1">
-          <Outlet />
-        </main>
-      </div>
+  const current = NAV_ITEMS.find(item => location.pathname.startsWith(item.path))?.label || 'Quiz studio';
+  useEffect(() => { setSidebarOpen(false); document.title = `${current} · AnimPlay`; }, [location.pathname, current]);
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const close = (e: KeyboardEvent) => { if (e.key === 'Escape') setSidebarOpen(false); };
+    document.addEventListener('keydown', close);
+    return () => document.removeEventListener('keydown', close);
+  }, [sidebarOpen]);
+  return <div className="app-shell">
+    <a className="skip-link" href="#main-content">Skip to content</a>
+    {sidebarOpen && <button aria-label="Close navigation" className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
+    <aside id="app-navigation" className={`app-sidebar ${sidebarOpen ? 'is-open' : ''}`}>
+      <Link to="/" className="brand"><span className="brand-mark">A<span>✦</span></span>AnimPlay<span className="brand-dot">.</span></Link>
+      <div className="sidebar-caption">YOUR WORKSPACE</div>
+      <nav aria-label="Main navigation">{NAV_ITEMS.map(item => {
+        const active = current === item.label;
+        return <Link key={item.path} to={item.path} className={`nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined}><Icon name={item.icon} /><span>{item.label}</span>{active && <span className="nav-dot" />}</Link>;
+      })}</nav>
+      <div className="sidebar-note"><span className="note-spark">✦</span><strong>A little curiosity.<br />A lot of possibility.</strong><p>Your next great game starts with a question.</p><Link to="/quiz/new">Create something fun <Icon name="arrow" size={16} /></Link></div>
+      <div className="sidebar-account"><span className="avatar">{username.slice(0,1).toUpperCase()}</span><div><strong>{username}</strong><span>Host workspace</span></div><button aria-label="Sign out" title="Sign out" onClick={onLogout}><Icon name="logout" size={18} /></button></div>
+    </aside>
+    <div className="workspace"><header className="workspace-bar"><div className="workspace-breadcrumb"><button className="icon-button mobile-menu" aria-label="Open navigation" aria-expanded={sidebarOpen} aria-controls="app-navigation" onClick={() => setSidebarOpen(!sidebarOpen)}><Icon name="menu" /></button><span>Workspace</span><span className="breadcrumb-slash">/</span><strong>{current}</strong></div><Link className="join-link" to="/join"><Icon name="play" size={14} /> Join a game</Link></header>
+      <main id="main-content" className="workspace-main"><Outlet /></main>
+      <footer className="workspace-footer"><span>Made for curious minds.</span><a href="/quiz-sources.html" target="_blank" rel="noreferrer">Question sources & credits ↗</a></footer>
     </div>
-  );
+  </div>;
 }

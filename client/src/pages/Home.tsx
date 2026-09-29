@@ -28,7 +28,7 @@ export default function Home() {
       <section className="relative z-10 mx-auto grid min-h-[calc(100vh-96px)] max-w-7xl items-center gap-14 px-5 pb-20 pt-8 md:px-8 lg:grid-cols-[1.05fr_.95fr] lg:pb-28 lg:pt-6">
         <div className="max-w-2xl animate-slide-up">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-extrabold text-cyan-100 backdrop-blur-xl">
-            <span className="live-dot" /> Live quizzes. Big energy. Zero setup drama.
+            <span className="live-dot" /> Live quizzes. Big energy. Ready when you are.
           </div>
           <h1 className="font-display text-6xl leading-[.94] tracking-[-0.04em] sm:text-7xl md:text-8xl">
             Turn any room into a <span className="hero-highlight">game show.</span>
@@ -49,7 +49,7 @@ export default function Home() {
           <div className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-3 text-sm font-bold text-indigo-100/70">
             <span className="flex items-center gap-2"><span className="text-emerald-300">✓</span> Free to start</span>
             <span className="flex items-center gap-2"><span className="text-emerald-300">✓</span> No app download</span>
-            <span className="flex items-center gap-2"><span className="text-emerald-300">✓</span> Powered by Firebase</span>
+            <span className="flex items-center gap-2"><span className="text-emerald-300">✓</span> 30 ready-to-play quizzes</span>
           </div>
         </div>
 

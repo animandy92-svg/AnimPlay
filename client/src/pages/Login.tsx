@@ -44,7 +44,7 @@ export default function Login() {
 
   return (
     <div className="relative min-h-screen overflow-hidden flex flex-col items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#512da8] via-[#9c27b0] via-[30%] via-[#ff1744] via-[60%] to-[#3f51b5] bg-[length:400%_400%] animate-gradient-bg" />
+      <div className="absolute inset-0 home-shell" />
 
       <div className="relative z-10 w-full max-w-md">
         <h1 className="font-display text-5xl text-white text-center mb-8 animate-spring-bounce">Login</h1>

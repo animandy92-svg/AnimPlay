@@ -55,8 +55,8 @@ export default function Assignments() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="font-display text-4xl text-animplay-brand mb-6">Assignments</h1>
+    <div className="section-page">
+      <h1 className="font-display text-4xl text-animplay-brand mb-6">Assignments</h1><p className="section-description">A clear view of what is next, what is done, and what needs your attention.</p>
 
       <div className="flex gap-2 mb-6">
         {(['todo', 'completed', 'expired'] as const).map(t => (

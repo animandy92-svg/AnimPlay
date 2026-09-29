@@ -99,9 +99,9 @@ export default function HostLobby() {
   const unassignedPlayers = players.filter(p => !p.teamId);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-animplay-purple to-animplay-purple-dark flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen home-shell flex flex-col items-center justify-center p-4">
       <div className="text-center mb-8">
-        <h1 className="font-display text-5xl text-white mb-2">Game PIN</h1>
+        <h1 className="font-display text-4xl sm:text-5xl text-white mb-2">Game PIN</h1>
         <div className="bg-white rounded-3xl py-8 px-16 shadow-2xl animate-pulse-glow">
           <div className="font-display text-8xl text-animplay-purple tracking-[0.3em]">
             {gamePin}

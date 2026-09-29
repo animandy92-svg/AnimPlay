@@ -87,8 +87,8 @@ export default function Groups() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
+    <div className="section-page">
+      <p className="section-description">Bring your people together. Create a group or join with an invite code.</p><div className="flex flex-wrap gap-4 justify-between items-center mb-6">
         <h1 className="font-display text-4xl text-animplay-brand">Groups</h1>
         <div className="flex gap-2">
           <button

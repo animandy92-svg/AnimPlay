@@ -36,7 +36,7 @@ export default function Results() {
 
   if (rankings.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-animplay-purple to-animplay-purple-dark flex items-center justify-center">
+      <div className="min-h-screen home-shell flex items-center justify-center">
         <div className="text-center text-white">
           <div className="text-6xl mb-4">🏆</div>
           <h1 className="font-display text-4xl mb-4">Loading results...</h1>
@@ -51,8 +51,8 @@ export default function Results() {
   const third = podium[2];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-animplay-purple to-animplay-purple-dark flex flex-col items-center justify-center p-4">
-      <h1 className="font-display text-5xl text-white text-center mb-8">
+    <div className="min-h-screen home-shell flex flex-col items-center justify-center p-4">
+      <h1 className="font-display text-4xl sm:text-5xl text-white text-center mb-8">
         Final Results
       </h1>
 
@@ -78,7 +78,7 @@ export default function Results() {
               <div className="text-white/70">{first.score.toLocaleString()}</div>
             </div>
             <div className="bg-animplay-yellow h-32 rounded-t-xl flex items-center justify-center animate-pulse-glow">
-              <span className="font-display text-5xl text-white">1</span>
+              <span className="font-display text-4xl sm:text-5xl text-white">1</span>
             </div>
           </div>
         )}
