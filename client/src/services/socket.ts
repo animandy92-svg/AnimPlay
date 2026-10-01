@@ -1,416 +1,253 @@
 import { signInAnonymously } from 'firebase/auth';
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  onSnapshot,
-  setDoc,
-  updateDoc,
-  writeBatch,
-  type Unsubscribe,
-} from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, type Unsubscribe } from 'firebase/firestore';
 import { auth, db, waitForAuth } from './firebase';
+import { rankPlayers, scoreAnswer, settingsFor, type GameRecord } from './gameLogic';
 
-type Handler = (...args: any[]) => void;
-type GameData = Record<string, any>;
+type Handler = (data?: any) => void;
+export const gameStorage = sessionStorage;
+export function gameError(error: any): string {
+  if (error?.code === 'permission-denied') return 'This session is no longer available to you. Rejoin with the game PIN, or sign in as the host.';
+  if (error?.code === 'unavailable' || !navigator.onLine) return 'Your connection was interrupted. Reconnect to the internet and try again.';
+  if (error?.code?.startsWith('auth/')) return 'Sign-in could not connect. Please try again in a moment.';
+  return error?.message || 'That action could not be completed. Please try again.';
+}
 
-const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
+// Each tab has its own seat; snapshots restore the entire UI after navigation or refresh.
 export class FirebaseGameSocket {
+  constructor(private database = db, private getIdentity?: () => Promise<{ uid: string }>) {}
   connected = false;
   private listeners = new Map<string, Set<Handler>>();
   private unsubs: Unsubscribe[] = [];
-  private gamePin = '';
-  private sessionId = '';
+  private pin = '';
+  private seat = '';
   private role: 'host' | 'player' | null = null;
-  private lastGame: GameData | null = null;
-  private previousPlayers = new Map<string, GameData>();
-  private previousMessageIds = new Set<string>();
-  private timer: number | null = null;
-  private finalizing = false;
+  private game: GameRecord | null = null;
+  private quiz: GameRecord | null = null;
+  private players: GameRecord[] = [];
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private heartbeat = 0;
+  private closing = false;
+  private connecting: Promise<void> | null = null;
+  private commands = new Set<string>();
+  private generation = 0;
 
-  connect() {
-    if (this.connected) return;
-    this.connected = true;
-    queueMicrotask(() => this.dispatch('connect'));
-  }
-
-  disconnect() {
-    this.connected = false;
-    this.stopSubscriptions();
-    this.dispatch('disconnect');
-  }
-
+  connect() { this.connected = true; this.dispatch('connect'); return this; }
+  disconnect() { this.stop(); this.connected = false; this.game = null; this.players = []; this.role = null; this.dispatch('disconnect'); }
   on(event: string, handler: Handler) {
     if (!this.listeners.has(event)) this.listeners.set(event, new Set());
     this.listeners.get(event)!.add(handler);
-    if (event === 'connect' && this.connected) queueMicrotask(() => handler());
-    if (this.lastGame) {
-      if (event === 'host-question-start' && this.role === 'host' && this.lastGame.phase === 'question') queueMicrotask(() => handler(this.questionPayload(this.lastGame!)));
-      if (event === 'player-question-start' && this.role === 'player' && this.lastGame.phase === 'question') queueMicrotask(() => handler(this.questionPayload(this.lastGame!)));
-      if (event === 'question-ended' && this.lastGame.phase === 'results') queueMicrotask(() => handler({ correctIndex: this.lastGame!.correctIndex, stats: this.lastGame!.stats || [], leaderboard: this.lastGame!.leaderboard || [] }));
-      if (event === 'game-ended' && this.lastGame.status === 'finished') queueMicrotask(() => handler({ finalRankings: this.lastGame!.finalRankings || [] }));
-      if (event === 'team-updated') queueMicrotask(() => handler({ teams: this.lastGame!.teams || [] }));
-    }
-    if (event === 'player-list' && this.previousPlayers.size) queueMicrotask(() => handler({ players: [...this.previousPlayers.values()].map(player => player.nickname) }));
-    if (event === 'update-player-list' && this.previousPlayers.size) queueMicrotask(() => handler([...this.previousPlayers.values()].map(player => ({ playerId: player.playerId, nickname: player.nickname, teamId: player.teamId || undefined, character: player.character }))));
-    return this;
-  }
-
-  off(event: string, handler?: Handler) {
-    if (handler) this.listeners.get(event)?.delete(handler);
-    else this.listeners.delete(event);
-    return this;
-  }
-
-  emit(event: string, data: any = {}) {
-    void this.handle(event, data).catch(error => {
-      this.dispatch(event === 'join-game' ? 'join-error' : 'error', { message: error?.message || 'Something went wrong.' });
+    queueMicrotask(() => {
+      if (!this.listeners.get(event)?.has(handler)) return;
+      if (event === 'connect' && this.connected) handler();
+      if (event === 'game-state' && this.game) handler(this.game);
+      if (event === 'update-player-list') handler(this.players);
+      if (event === 'player-state') handler(this.players.find(p => p.playerId === this.seat) || null);
     });
     return this;
   }
-
-  private dispatch(event: string, data?: any) {
-    this.listeners.get(event)?.forEach(handler => handler(data));
-  }
-
-  private stopSubscriptions() {
-    this.unsubs.forEach(unsub => unsub());
-    this.unsubs = [];
-    if (this.timer) window.clearInterval(this.timer);
-    this.timer = null;
-  }
-
-  private async ensureIdentity() {
-    let user = await waitForAuth();
-    if (!user) user = (await signInAnonymously(auth)).user;
-    return user;
-  }
-
-  private async handle(event: string, data: any) {
-    switch (event) {
-      case 'host-register': return this.registerHost(data.gamePin);
-      case 'join-game': return this.joinGame(data);
-      case 'reconnect-player': return this.reconnectPlayer(data);
-      case 'host-start-game': return this.startGame();
-      case 'host-next-question': return this.nextQuestion();
-      case 'host-end-game': return this.endGame();
-      case 'answer-submitted': return this.submitAnswer(data);
-      case 'create-team': return this.createTeam(data);
-      case 'join-team': return this.joinTeam(data.teamId);
-      case 'kick-player': return this.kickPlayer(data.playerId);
-      case 'host-judge': return this.judgeAnswer(data.playerId, data.points);
-      case 'chat-message': return this.sendMessage(data.message, 'chat');
-      case 'send-reaction': return this.sendMessage(data.reaction, 'reaction');
-      case 'buy-powerup': return this.dispatch('error', { message: 'Power-ups unlock after you score 500 points.' });
-      case 'use-powerup': return;
+  off(event: string, handler?: Handler) { if (handler) this.listeners.get(event)?.delete(handler); else this.listeners.delete(event); return this; }
+  emit(event: string, data: any = {}) { void this.request(event, data).catch(error => this.dispatch('error', { message: gameError(error) })); return this; }
+  async request(event: string, data: any = {}): Promise<any> {
+    if (!navigator.onLine) throw new Error('You are offline. Reconnect before continuing.');
+    if (['host-register', 'reconnect-player'].includes(event)) {
+      if (this.connecting) await this.connecting;
+      this.connecting = this.restore(event === 'host-register' ? 'host' : 'player', data);
+      try { return await this.connecting; } finally { this.connecting = null; }
     }
-  }
-
-  private async registerHost(pin: string) {
-    const user = await this.ensureIdentity();
-    const game = await getDoc(doc(db, 'games', pin));
-    if (!game.exists() || game.data().hostUid !== user.uid) throw new Error('This game is not available to this host.');
-    this.gamePin = pin;
-    this.role = 'host';
-    this.subscribe();
-  }
-
-  private async joinGame(data: { gamePin: string; nickname: string; teamId?: number; character?: string }) {
-    const user = await this.ensureIdentity();
-    const gameRef = doc(db, 'games', data.gamePin);
-    const game = await getDoc(gameRef);
-    if (!game.exists() || game.data().status !== 'lobby') throw new Error('Game not found or already started.');
-    const nickname = data.nickname.trim().slice(0, 20);
-    if (!nickname) throw new Error('Choose a nickname.');
-    const currentPlayers = await getDocs(collection(db, 'games', data.gamePin, 'players'));
-    if (currentPlayers.size >= 100) throw new Error('This lobby is full.');
-    if (currentPlayers.docs.some(item => item.data().nickname.toLowerCase() === nickname.toLowerCase())) throw new Error('That nickname is already taken.');
-
-    this.gamePin = data.gamePin;
-    this.sessionId = makeId();
-    this.role = 'player';
-    await setDoc(doc(db, 'games', this.gamePin, 'players', this.sessionId), {
-      playerId: this.sessionId,
-      sessionId: this.sessionId,
-      authUid: user.uid,
-      nickname,
-      character: data.character || '✨',
-      teamId: data.teamId || null,
-      score: 0,
-      streak: 0,
-      correct: 0,
-      hasAnswered: false,
-      answeredQuestion: null,
-      joinedAt: new Date().toISOString(),
-    });
-    this.subscribe();
-    this.dispatch('answer-confirmed', { accepted: true, playerId: this.sessionId, sessionId: this.sessionId });
-  }
-
-  private async reconnectPlayer(data: { sessionId: string; nickname: string; gamePin?: string }) {
-    const pin = data.gamePin || localStorage.getItem('animplay_player_gamePin') || '';
-    const user = await this.ensureIdentity();
-    const playerRef = doc(db, 'games', pin, 'players', data.sessionId);
-    const [game, player] = await Promise.all([getDoc(doc(db, 'games', pin)), getDoc(playerRef)]);
-    if (!game.exists() || !player.exists() || player.data().authUid !== user.uid) throw new Error('Unable to reconnect. Please join again.');
-    this.gamePin = pin;
-    this.sessionId = data.sessionId;
-    this.role = 'player';
-    await updateDoc(playerRef, { nickname: data.nickname.trim().slice(0, 20), lastSeenAt: new Date().toISOString() });
-    this.subscribe();
-    this.dispatch('answer-confirmed', { accepted: true, playerId: this.sessionId, sessionId: this.sessionId });
-    this.dispatch('player-reconnected', { playerId: this.sessionId });
-  }
-
-  private subscribe() {
-    this.stopSubscriptions();
-    this.previousPlayers.clear();
-    this.previousMessageIds.clear();
-    const gameRef = doc(db, 'games', this.gamePin);
-    this.unsubs.push(onSnapshot(gameRef, snapshot => {
-      if (!snapshot.exists()) {
-        this.dispatch('host-disconnected');
-        return;
-      }
-      const next = snapshot.data();
-      const previous = this.lastGame;
-      this.lastGame = next;
-      this.dispatch('team-updated', { teams: next.teams || [] });
-      this.handleGameChange(previous, next);
-    }));
-
-    this.unsubs.push(onSnapshot(collection(db, 'games', this.gamePin, 'players'), snapshot => {
-      const players = new Map(snapshot.docs.map(item => [item.id, item.data()]));
-      const list = [...players.values()].map(player => ({ playerId: player.playerId, nickname: player.nickname, teamId: player.teamId || undefined, character: player.character }));
-      this.dispatch('update-player-list', list);
-      this.dispatch('player-list', { players: list.map(player => player.nickname) });
-      snapshot.docChanges().forEach(change => {
-        const player = change.doc.data();
-        if (change.type === 'added' && !this.previousPlayers.has(change.doc.id)) this.dispatch('player-joined', { ...player, playerCount: players.size });
-        if (change.type === 'removed') this.dispatch('player-left', { ...player, playerCount: players.size });
-      });
-      this.previousPlayers = players;
-      if (this.role === 'host' && this.lastGame?.phase === 'question') {
-        const answeredCount = [...players.values()].filter(player => player.answeredQuestion === this.lastGame?.currentQuestion).length;
-        this.dispatch('answer-received', { answeredCount, totalCount: players.size });
-        const currentQuestion = this.lastGame.quiz.questions[this.lastGame.currentQuestion];
-        if (currentQuestion?.questionType === 'open_ended') {
-          this.dispatch('pending-answers', {
-            answers: [...players.values()].filter(player => player.answeredQuestion === this.lastGame?.currentQuestion && player.judgedQuestion !== this.lastGame?.currentQuestion).map(player => ({ playerId: player.playerId, nickname: player.nickname, answerIndex: player.answerIndex || 0, responseText: player.responseText || '' })),
-          });
-        } else if (players.size > 0 && answeredCount === players.size) {
-          void this.finalizeQuestion();
-        }
-      }
-    }));
-
-    this.unsubs.push(onSnapshot(collection(db, 'games', this.gamePin, 'messages'), snapshot => {
-      snapshot.docChanges().forEach(change => {
-        if (change.type !== 'added' || this.previousMessageIds.has(change.doc.id)) return;
-        const message = change.doc.data();
-        if (message.type === 'reaction') this.dispatch('reaction-received', { playerId: message.playerId, reaction: message.message });
-        else this.dispatch('chat-received', message);
-        this.previousMessageIds.add(change.doc.id);
-      });
-    }));
-  }
-
-  private handleGameChange(previous: GameData | null, next: GameData) {
-    if (next.status === 'active' && previous?.status !== 'active') this.dispatch('game-started', { totalQuestions: next.quiz.questions.length });
-    if (next.phase === 'question' && (previous?.phase !== 'question' || previous?.currentQuestion !== next.currentQuestion)) {
-      const payload = this.questionPayload(next);
-      this.dispatch(this.role === 'host' ? 'host-question-start' : 'player-question-start', payload);
-      if (this.role === 'host') this.startTimer(next);
-    }
-    if (next.phase === 'results' && previous?.phase !== 'results') {
-      this.dispatch('question-ended', { correctIndex: next.correctIndex, stats: next.stats || [], leaderboard: next.leaderboard || [] });
-    }
-    if (next.status === 'finished' && previous?.status !== 'finished') this.dispatch('game-ended', { finalRankings: next.finalRankings || [] });
-  }
-
-  private questionPayload(game: GameData) {
-    const question = game.quiz.questions[game.currentQuestion];
-    return {
-      questionId: question.id,
-      questionText: question.question_text,
-      media: question.media || null,
-      answers: question.answers || [],
-      answerCount: question.answers?.length || 0,
-      timer: question.timer_seconds,
-      startsAt: game.questionStartsAt,
-      questionIndex: game.currentQuestion,
-      totalQuestions: game.quiz.questions.length,
-      questionType: question.questionType || 'multiple_choice',
-    };
-  }
-
-  private startTimer(game: GameData) {
-    if (this.timer) window.clearInterval(this.timer);
-    this.timer = window.setInterval(() => {
-      const timeLeft = Math.max(0, Math.ceil((game.questionEndsAt - Date.now()) / 1000));
-      this.dispatch('timer-tick', { timeLeft });
-      if (timeLeft <= 0) {
-        if (this.timer) window.clearInterval(this.timer);
-        this.timer = null;
-        void this.finalizeQuestion();
-      }
-    }, 250);
-  }
-
-  private async startGame() {
-    if (this.role !== 'host' || !this.lastGame) return;
-    await this.launchQuestion(0, true);
-  }
-
-  private async launchQuestion(index: number, first = false) {
-    if (!this.lastGame) return;
-    const question = this.lastGame.quiz.questions[index];
-    if (!question) return this.endGame();
-    const players = await getDocs(collection(db, 'games', this.gamePin, 'players'));
-    const batch = writeBatch(db);
-    players.docs.forEach(player => batch.update(player.ref, { hasAnswered: false, answeredQuestion: null, answerIndex: null, responseText: '', responseTimeMs: null, judgedQuestion: null }));
-    const startsAt = Date.now() + 1200;
-    batch.update(doc(db, 'games', this.gamePin), {
-      status: 'active', phase: 'question', currentQuestion: index,
-      startedAt: first ? new Date().toISOString() : this.lastGame.startedAt,
-      questionStartsAt: startsAt, questionEndsAt: startsAt + question.timer_seconds * 1000,
-      correctIndex: null, stats: [], leaderboard: [],
-    });
-    await batch.commit();
-  }
-
-  private async submitAnswer(data: { questionId: number; answerIndex: number; responseTimeMs: number; responseText?: string }) {
-    if (this.role !== 'player' || !this.lastGame || this.lastGame.phase !== 'question') return;
-    const question = this.lastGame.quiz.questions[this.lastGame.currentQuestion];
-    if (!question || question.id !== data.questionId || Date.now() > this.lastGame.questionEndsAt + 500) return;
-    const ref = doc(db, 'games', this.gamePin, 'players', this.sessionId);
-    const player = await getDoc(ref);
-    if (!player.exists() || player.data().answeredQuestion === this.lastGame.currentQuestion) return;
-    await updateDoc(ref, {
-      hasAnswered: true,
-      answeredQuestion: this.lastGame.currentQuestion,
-      answerIndex: data.answerIndex,
-      responseText: String(data.responseText || '').trim().slice(0, 180),
-      responseTimeMs: Math.max(0, Number(data.responseTimeMs) || 0),
-    });
-    this.dispatch('answer-confirmed', { accepted: true, playerId: this.sessionId });
-  }
-
-  private leaderboard(players: GameData[]) {
-    const teams = new Map((this.lastGame?.teams || []).map((team: GameData) => [team.id, team.name]));
-    return players.sort((a, b) => b.score - a.score).map((player, index) => ({
-      rank: index + 1, playerId: player.playerId, nickname: player.nickname, character: player.character,
-      score: player.score || 0, correct: player.correct || 0, streak: player.streak || 0,
-      teamId: player.teamId || undefined, teamName: teams.get(player.teamId) || undefined,
-    }));
-  }
-
-  private async finalizeQuestion() {
-    if (this.role !== 'host' || !this.lastGame || this.lastGame.phase !== 'question' || this.finalizing) return;
-    this.finalizing = true;
+    if (this.commands.has(event)) return;
+    this.commands.add(event);
     try {
-      const gameSnap = await getDoc(doc(db, 'games', this.gamePin));
-      if (!gameSnap.exists() || gameSnap.data().phase !== 'question') return;
-      const game = gameSnap.data();
-      const question = game.quiz.questions[game.currentQuestion];
-      const playerSnaps = await getDocs(collection(db, 'games', this.gamePin, 'players'));
-      const stats = (question.answers || []).map((_: any, answerIndex: number) => ({ answerIndex, count: 0 }));
-      const batch = writeBatch(db);
-      const nextPlayers = playerSnaps.docs.map(item => {
-        const player = item.data();
-        const answered = player.answeredQuestion === game.currentQuestion;
-        if (answered && stats[player.answerIndex]) stats[player.answerIndex].count += 1;
-        const correct = answered && question.questionType !== 'open_ended' && player.answerIndex === question.correct_index;
-        const nextStreak = correct ? (player.streak || 0) + 1 : 0;
-        const speed = Math.max(0.5, 1 - (player.responseTimeMs || 0) / (question.timer_seconds * 2000));
-        const earned = correct ? Math.round((question.points || 1000) * speed + Math.min(nextStreak * 50, 500)) : 0;
-        const next = { ...player, score: (player.score || 0) + earned, correct: (player.correct || 0) + (correct ? 1 : 0), streak: nextStreak, pointsEarned: earned };
-        batch.update(item.ref, { score: next.score, correct: next.correct, streak: next.streak, pointsEarned: earned });
-        return next;
+      switch (event) {
+        case 'join-game': return await this.join(data);
+        case 'host-start-game': return await this.launch(-1);
+        case 'host-next-question': return await this.launch(data.questionIndex);
+        case 'host-end-question': return await this.closeQuestion();
+        case 'host-end-game': return await this.end();
+        case 'answer-submitted': return await this.answer(data);
+        case 'host-judge': return await this.judge(data);
+        case 'game-settings': return await this.lobbyChange(game => ({ settings: settingsFor(data) }));
+        case 'create-team': return await this.lobbyChange(game => {
+          const name = String(data.name).trim().slice(0, 24), teams = game.teams || [];
+          if (!name) throw new Error('Enter a team name.');
+          if (teams.length >= 8) throw new Error('You can create up to eight teams.');
+          if (teams.some((t: GameRecord) => t.name.toLowerCase() === name.toLowerCase())) throw new Error('That team name is already in use.');
+          return { teams: [...teams, { id: Date.now(), name, color: data.color || '#6d28d9' }] };
+        });
+        case 'join-team': return await this.joinTeam(data.teamId);
+        case 'kick-player': return await this.remove(data.playerId);
+        case 'leave-game': await this.remove(this.seat); this.disconnect(); return;
+      }
+    } finally { this.commands.delete(event); }
+  }
+  private dispatch(event: string, data?: any) { this.listeners.get(event)?.forEach(handler => handler(data)); }
+  private stop() { this.generation++; this.unsubs.forEach(unsub => unsub()); this.unsubs = []; if (this.timer) clearInterval(this.timer); this.timer = null; }
+  private async identity() { return this.getIdentity ? this.getIdentity() : auth.currentUser || await waitForAuth() || (await signInAnonymously(auth)).user; }
+  private async restore(role: 'host' | 'player', data: GameRecord) {
+    if (this.role === role && this.pin === data.gamePin && (role === 'host' || this.seat === data.sessionId) && this.unsubs.length) return;
+    const user = await this.identity(), game = await getDoc(doc(this.database, 'games', data.gamePin));
+    if (!game.exists()) throw new Error('This game is no longer available. Start or join another game.');
+    if (role === 'host') {
+      if (game.data().hostUid !== user.uid) throw new Error('Sign in with the account that started this game.');
+      const secret = game.data().version === 2 ? await getDoc(doc(this.database, 'games', data.gamePin, 'private', 'quiz')) : null;
+      this.quiz = secret?.exists() ? secret.data() : game.data().quiz;
+      if (!this.quiz?.questions?.length) throw new Error('The quiz could not be loaded. Start a new game from your library.');
+    } else {
+      const player = await getDoc(doc(this.database, 'games', data.gamePin, 'players', data.sessionId));
+      if (!player.exists() || player.data().authUid !== user.uid) throw new Error('Your saved seat is no longer available. Join again with the game PIN.');
+      gameStorage.setItem('animplay_nickname', player.data().nickname); this.quiz = null;
+    }
+    this.pin = data.gamePin; this.seat = role === 'player' ? data.sessionId : ''; this.role = role; this.heartbeat = 0; this.subscribe();
+  }
+  private async join(data: GameRecord) {
+    const nickname = String(data.nickname).trim().replace(/\s+/g, ' ');
+    if (!/^\d{6}$/.test(data.gamePin)) throw new Error('Enter the six-digit game PIN.');
+    if (!nickname || nickname.length > 20) throw new Error('Choose a nickname between 1 and 20 characters.');
+    const user = await this.identity(), seat = crypto.randomUUID(), nameKey = encodeURIComponent(nickname.toLowerCase());
+    const gameRef = doc(this.database, 'games', data.gamePin), nameRef = doc(this.database, 'games', data.gamePin, 'names', nameKey);
+    const joinedSeat = await runTransaction(this.database, async tx => {
+      const [game, name] = await Promise.all([tx.get(gameRef), tx.get(nameRef)]);
+      if (!game.exists()) throw new Error('No game has that PIN. Check the six digits with your host.');
+      if (name.exists() && name.data().authUid === user.uid) {
+        const saved = await tx.get(doc(this.database, 'games', data.gamePin, 'players', name.data().playerId));
+        if (saved.exists()) return name.data().playerId as string;
+      }
+      if (game.data().status !== 'lobby') throw new Error('This game has already started or ended. Ask the host for the next game PIN.');
+      if (name.exists()) throw new Error('That nickname is taken. Add a name or number to make yours unique.');
+      if ((game.data().playerCount || 0) >= 100) throw new Error('This game has reached its 100-player limit.');
+      tx.set(doc(this.database, 'games', data.gamePin, 'players', seat), { playerId: seat, sessionId: seat, nameKey, authUid: user.uid, nickname, character: data.character || '✨', teamId: null, score: 0, streak: 0, correct: 0, answeredQuestion: null, answerIndex: null, responseText: '', responseTimeMs: 0, judgedQuestion: null, awardedPoints: 0, judgedCorrect: false, history: [], joinedAt: serverTimestamp() });
+      tx.set(nameRef, { playerId: seat, authUid: user.uid });
+      tx.update(gameRef, { playerCount: (game.data().playerCount || 0) + 1, lastJoinedPlayer: seat });
+      return seat;
+    });
+    gameStorage.setItem('animplay_player_gamePin', data.gamePin); gameStorage.setItem('animplay_player_sessionId', joinedSeat); gameStorage.setItem('animplay_nickname', nickname);
+    this.pin = data.gamePin; this.seat = joinedSeat; this.role = 'player'; this.quiz = null; this.subscribe();
+  }
+  private subscribe() {
+    this.stop(); this.game = null; this.players = []; const generation = this.generation;
+    const failed = (error: any) => { if (generation === this.generation) { this.dispatch('error', { message: gameError(error) }); this.stop(); } };
+    this.unsubs.push(onSnapshot(doc(this.database, 'games', this.pin), snapshot => {
+      if (generation !== this.generation) return;
+      if (!snapshot.exists()) { this.dispatch('error', { message: 'This game is no longer available.' }); return; }
+      this.game = { ...snapshot.data(), gamePin: snapshot.id }; this.dispatch('game-state', this.game);
+    }, failed));
+    this.unsubs.push(onSnapshot(collection(this.database, 'games', this.pin, 'players'), snapshot => {
+      if (generation !== this.generation) return;
+      this.players = snapshot.docs.map(item => ({ ...item.data(), playerId: item.id })); this.dispatch('update-player-list', this.players);
+      const mine = this.players.find(p => p.playerId === this.seat); this.dispatch('player-state', mine || null);
+      if (this.role === 'player' && !mine) this.dispatch('removed', { message: 'Your seat was removed by the host. You can join another game.' });
+    }, failed));
+    this.timer = setInterval(() => {
+      if (this.role !== 'host' || !this.game || this.game.status === 'finished' || !navigator.onLine) return;
+      if (Date.now() - this.heartbeat > 10000) {
+        this.heartbeat = Date.now();
+        void runTransaction(this.database, async tx => { const ref = doc(this.database, 'games', this.pin), snap = await tx.get(ref); if (snap.exists() && snap.data().status !== 'finished') tx.update(ref, { hostSeenAt: Date.now() }); }).catch(failed);
+      }
+      const game = this.game;
+      if (game.phase === 'question' && (game.questionEndsAt !== null && Date.now() >= game.questionEndsAt || this.players.length > 0 && this.players.every(p => p.answeredQuestion === game.currentQuestion)) || game.phase === 'review' && this.players.every(p => p.answeredQuestion !== game.currentQuestion || p.judgedQuestion === game.currentQuestion)) {
+        void this.closeQuestion().catch(error => this.dispatch('error', { message: gameError(error) }));
+      }
+    }, 500);
+  }
+  private hostOnly() { if (this.role !== 'host') throw new Error('Only the host can do that.'); }
+  private async launch(expectedIndex: number) {
+    this.hostOnly();
+    const players = await getDocs(collection(this.database, 'games', this.pin, 'players'));
+    if (!players.size) throw new Error('Wait for at least one player before starting.');
+    await runTransaction(this.database, async tx => {
+      const ref = doc(this.database, 'games', this.pin), snap = await tx.get(ref); if (!snap.exists()) throw new Error('Game not found.');
+      const game = snap.data();
+      if (game.currentQuestion !== expectedIndex || !['lobby', 'results'].includes(game.phase)) return;
+      if (game.phase === 'lobby' && !game.playerCount) throw new Error('Wait for at least one player before starting.');
+      const next = expectedIndex + 1;
+      if (next >= game.quiz.questions.length) { tx.update(ref, { status: 'finished', phase: 'finished', endedAt: new Date().toISOString(), finalRankings: game.leaderboard || [] }); return; }
+      const settings = settingsFor(game.settings), startsAt = Date.now() + 2000, duration = game.quiz.questions[next].timer_seconds * settings.timeMultiplier * 1000;
+      tx.update(ref, { status: 'active', phase: 'question', currentQuestion: next, startedAt: game.startedAt || new Date().toISOString(), questionStartsAt: startsAt, questionEndsAt: settings.playStyle === 'relaxed' ? null : startsAt + duration, durationMs: duration, correctIndex: null, explanation: '', hostSeenAt: Date.now() });
+    });
+  }
+  private async answer(data: GameRecord) {
+    if (this.role !== 'player') throw new Error('Join a game before answering.');
+    await runTransaction(this.database, async tx => {
+      const gameRef = doc(this.database, 'games', this.pin), playerRef = doc(this.database, 'games', this.pin, 'players', this.seat);
+      const [gs, ps] = await Promise.all([tx.get(gameRef), tx.get(playerRef)]);
+      if (!gs.exists() || !ps.exists()) throw new Error('Your session ended. Return to the join page.');
+      const game = gs.data(), player = ps.data(), question = game.quiz.questions[game.currentQuestion];
+      if (player.answeredQuestion === game.currentQuestion) return;
+      if (game.phase !== 'question' || question?.id !== data.questionId || Date.now() < game.questionStartsAt || game.questionEndsAt !== null && Date.now() > game.questionEndsAt) throw new Error('This round has closed. Your next question will appear shortly.');
+      const responseText = String(data.responseText || '').trim().slice(0, 180);
+      if (question.questionType === 'open_ended' ? !responseText : !Number.isInteger(data.answerIndex) || !question.answers[data.answerIndex]) throw new Error('Choose an answer before submitting.');
+      tx.update(playerRef, { answeredQuestion: game.currentQuestion, answerIndex: data.answerIndex, responseText, responseTimeMs: Math.max(0, Date.now() - game.questionStartsAt), submittedAt: serverTimestamp() });
+    });
+  }
+  private async closeQuestion() {
+    this.hostOnly(); if (this.closing || !this.game || !['question', 'review'].includes(this.game.phase)) return;
+    this.closing = true; const index = this.game.currentQuestion;
+    try {
+      const snaps = await getDocs(collection(this.database, 'games', this.pin, 'players'));
+      await runTransaction(this.database, async tx => {
+        const ref = doc(this.database, 'games', this.pin), gs = await tx.get(ref); if (!gs.exists()) return;
+        const game = gs.data(); if (!['question', 'review'].includes(game.phase) || game.currentQuestion !== index) return;
+        const all = await Promise.all(snaps.docs.map(p => tx.get(p.ref))), present = all.filter(p => p.exists());
+        const question = this.quiz!.questions[index], open = question.questionType === 'open_ended';
+        if (open && present.some(p => p.data()!.answeredQuestion === index && p.data()!.judgedQuestion !== index)) { if (game.phase !== 'review') tx.update(ref, { phase: 'review' }); return; }
+        const settings = settingsFor(game.settings), distribution = (question.answers || []).map((a: GameRecord, answerIndex: number) => ({ answerIndex, text: a.text, count: 0 }));
+        let answeredCount = 0, correctCount = 0, responseTotal = 0;
+        const correctAnswer = open ? 'Host reviewed' : question.answers[question.correct_index]?.text || '';
+        const nextPlayers = present.map(item => {
+          const player = item.data()!;
+          if (player.answeredQuestion === index && player.submittedAt?.toMillis) player.responseTimeMs = Math.max(0, player.submittedAt.toMillis() - game.questionStartsAt);
+          const result = scoreAnswer(question, player, index, settings, game.durationMs);
+          if (result.answered) { answeredCount++; responseTotal += player.responseTimeMs || 0; if (distribution[player.answerIndex]) distribution[player.answerIndex].count++; }
+          if (result.correct) correctCount++;
+          const history = [...(player.history || []), { questionIndex: index, questionId: question.id, questionText: question.question_text, answered: result.answered, correct: result.correct, points: result.points, responseTimeMs: result.answered ? player.responseTimeMs || 0 : null, answer: result.answered ? open ? player.responseText : question.answers[player.answerIndex]?.text || '' : '', correctAnswer, explanation: question.explanation || '' }];
+          const next = { ...player, score: (player.score || 0) + result.points, correct: (player.correct || 0) + Number(result.correct), streak: result.streak, history };
+          tx.update(item.ref, { score: next.score, correct: next.correct, streak: next.streak, history }); return next;
+        });
+        const report = { questionIndex: index, questionText: question.question_text, questionType: question.questionType, correctAnswer, explanation: question.explanation || '', answeredCount, correctCount, playerCount: present.length, averageResponseMs: answeredCount ? Math.round(responseTotal / answeredCount) : 0, distribution };
+        tx.update(ref, { phase: 'results', correctIndex: open ? null : question.correct_index, explanation: question.explanation || '', leaderboard: rankPlayers(nextPlayers, game.teams), questionReports: [...(game.questionReports || []), report] });
       });
-      const leaderboard = this.leaderboard(nextPlayers);
-      batch.update(doc(db, 'games', this.gamePin), { phase: 'results', correctIndex: question.correct_index || 0, stats, leaderboard });
-      await batch.commit();
-    } finally {
-      this.finalizing = false;
-    }
+    } finally { this.closing = false; }
   }
-
-  private async nextQuestion() {
-    if (this.role !== 'host' || !this.lastGame) return;
-    const nextIndex = this.lastGame.currentQuestion + 1;
-    if (nextIndex >= this.lastGame.quiz.questions.length) return this.endGame();
-    await this.launchQuestion(nextIndex);
+  private async judge(data: GameRecord) {
+    this.hostOnly(); await runTransaction(this.database, async tx => {
+      const ref = doc(this.database, 'games', this.pin, 'players', data.playerId), [gs, ps] = await Promise.all([tx.get(doc(this.database, 'games', this.pin)), tx.get(ref)]);
+      if (!gs.exists() || !ps.exists()) return;
+      const game = gs.data(), player = ps.data();
+      if (!['question', 'review'].includes(game.phase) || game.currentQuestion !== data.questionIndex || player.answeredQuestion !== data.questionIndex || player.judgedQuestion === data.questionIndex) return;
+      const q = this.quiz!.questions[data.questionIndex]; if (q.questionType !== 'open_ended') return;
+      tx.update(ref, { judgedQuestion: data.questionIndex, judgedCorrect: data.correct ?? data.points > 0, awardedPoints: Math.min(q.points, Math.max(0, Number(data.points) || 0)) });
+    });
   }
-
-  private async endGame() {
-    if (this.role !== 'host') return;
-    const players = await getDocs(collection(db, 'games', this.gamePin, 'players'));
-    const finalRankings = this.leaderboard(players.docs.map(item => item.data()));
-    await updateDoc(doc(db, 'games', this.gamePin), { status: 'finished', phase: 'finished', endedAt: new Date().toISOString(), finalRankings });
+  private async end() {
+    this.hostOnly(); if (['question', 'review'].includes(this.game?.phase)) await this.closeQuestion();
+    const players = await getDocs(collection(this.database, 'games', this.pin, 'players'));
+    await runTransaction(this.database, async tx => {
+      const ref = doc(this.database, 'games', this.pin), snap = await tx.get(ref); if (!snap.exists() || snap.data().status === 'finished') return;
+      if (['question', 'review'].includes(snap.data().phase)) throw new Error('Review all submitted answers before ending the game.');
+      tx.update(ref, { status: 'finished', phase: 'finished', endedAt: new Date().toISOString(), finalRankings: rankPlayers(players.docs.map(p => p.data()), snap.data().teams) });
+    });
   }
-
-  private async createTeam(data: { name: string; color: string }) {
-    if (this.role !== 'host' || !this.lastGame) return;
-    const team = { id: Date.now(), gameId: this.lastGame.id, name: data.name.trim().slice(0, 24), color: data.color, score: 0 };
-    await updateDoc(doc(db, 'games', this.gamePin), { teams: [...(this.lastGame.teams || []), team] });
-    this.dispatch('team-created', { teamId: team.id, name: team.name, color: team.color });
+  private async lobbyChange(change: (game: GameRecord) => GameRecord) {
+    this.hostOnly(); await runTransaction(this.database, async tx => { const ref = doc(this.database, 'games', this.pin), snap = await tx.get(ref); if (snap.exists() && snap.data().status === 'lobby') tx.update(ref, change(snap.data())); });
   }
-
-  private async joinTeam(teamId: number) {
+  private async joinTeam(teamId: number | null) {
     if (this.role !== 'player') return;
-    await updateDoc(doc(db, 'games', this.gamePin, 'players', this.sessionId), { teamId });
+    await runTransaction(this.database, async tx => {
+      const snap = await tx.get(doc(this.database, 'games', this.pin)); if (!snap.exists() || snap.data().status !== 'lobby') throw new Error('Teams are locked once the game starts.');
+      if (teamId && !snap.data().teams.some((t: GameRecord) => t.id === teamId)) throw new Error('That team is no longer available.');
+      tx.update(doc(this.database, 'games', this.pin, 'players', this.seat), { teamId });
+    });
   }
-
-  private async kickPlayer(playerId: string) {
-    if (this.role !== 'host') return;
-    await deleteDoc(doc(db, 'games', this.gamePin, 'players', playerId));
-  }
-
-  private async judgeAnswer(playerId: string, points: number) {
-    if (this.role !== 'host') return;
-    const ref = doc(db, 'games', this.gamePin, 'players', playerId);
-    const player = await getDoc(ref);
-    if (!player.exists()) return;
-    await updateDoc(ref, { score: (player.data().score || 0) + points, correct: (player.data().correct || 0) + (points > 0 ? 1 : 0), judgedQuestion: this.lastGame?.currentQuestion ?? null });
-    this.dispatch('answer-confirmed', { accepted: true, playerId });
-  }
-
-  private async sendMessage(message: string, type: 'chat' | 'reaction') {
-    if (!this.gamePin) return;
-    const user = await this.ensureIdentity();
-    let nickname = 'Host';
-    let playerId = user.uid;
-    if (this.role === 'player') {
-      const player = await getDoc(doc(db, 'games', this.gamePin, 'players', this.sessionId));
-      if (!player.exists()) return;
-      nickname = player.data().nickname;
-      playerId = this.sessionId;
-    }
-    const clean = String(message).trim().slice(0, type === 'chat' ? 200 : 8);
-    if (!clean) return;
-    const id = makeId();
-    await setDoc(doc(db, 'games', this.gamePin, 'messages', id), { id, authUid: user.uid, playerId, nickname, message: clean, type, createdAt: new Date().toISOString() });
+  private async remove(playerId: string) {
+    await runTransaction(this.database, async tx => {
+      const ref = doc(this.database, 'games', this.pin), playerRef = doc(this.database, 'games', this.pin, 'players', playerId), [game, player] = await Promise.all([tx.get(ref), tx.get(playerRef)]);
+      if (!game.exists() || !player.exists()) return;
+      if (game.data().status !== 'lobby') throw new Error('Players can leave or be removed in the lobby.');
+      tx.delete(playerRef); if (player.data().nameKey) tx.delete(doc(this.database, 'games', this.pin, 'names', player.data().nameKey));
+      tx.update(ref, { playerCount: Math.max(0, (game.data().playerCount || 0) - 1), lastLeftPlayer: playerId });
+    });
   }
 }
-
 let socket: FirebaseGameSocket | null = null;
-
-export function getSocket(): FirebaseGameSocket {
-  if (!socket) socket = new FirebaseGameSocket();
-  return socket;
-}
-
-export function connectSocket(): FirebaseGameSocket {
-  const instance = getSocket();
-  instance.connect();
-  return instance;
-}
-
-export function disconnectSocket(): void {
-  socket?.disconnect();
-  socket = null;
-}
+export function getSocket() { return socket ||= new FirebaseGameSocket(); }
+export function connectSocket() { return getSocket().connect(); }
+export function disconnectSocket() { socket?.disconnect(); socket = null; }

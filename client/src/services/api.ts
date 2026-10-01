@@ -1,4 +1,5 @@
 import { QUIZ_LIBRARY_WITH_TOPICS } from '../data/library';
+import { DEFAULT_SETTINGS, publicQuiz, validateQuiz } from './gameLogic';
 import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
@@ -87,6 +88,7 @@ function normalizeQuiz(id: number, raw: AnyRecord): AnyRecord {
       correct_index: question.correct_index ?? question.correctIndex ?? 0,
       correctIndex: question.correct_index ?? question.correctIndex ?? 0,
       questionType: question.questionType || 'multiple_choice',
+      explanation: question.explanation || '',
       sortOrder: question.sortOrder ?? index,
       answers: question.answers || [],
       ...(question.media ? { media: question.media } : {}),
@@ -182,6 +184,16 @@ export const api: any = {
     },
   },
   quizzes: {
+    practice: async (id: number) => {
+      const user = await waitForAuth();
+      if (user) {
+        const own = await getDoc(doc(db, 'users', user.uid, 'quizzes', String(id)));
+        if (own.exists() && !own.data().deletedAt) return { quiz: normalizeQuiz(id, own.data()) };
+      }
+      const quiz = STARTER_QUIZZES.find(q => q.id === id);
+      if (!quiz) throw new Error('This practice quiz is not available. Choose one from your library.');
+      return { quiz: normalizeQuiz(id, quiz) };
+    },
     save: async (id: number | null, title: string, description: string, questions: AnyRecord[]) => {
       const user = await userContext();
       const timestamp = now();
@@ -283,6 +295,7 @@ export const api: any = {
         id: makeId(), question_text: question.question_text.trim(),
         timer_seconds: Number(question.timer_seconds) || 20, points: Number(question.points) || 0,
         correct_index: Number(question.correct_index) || 0, questionType: question.questionType || 'multiple_choice',
+        explanation: String(question.explanation || '').trim().slice(0, 1000),
         answers: question.questionType === 'open_ended' ? [] : question.answers, sortOrder: questions.length,
         ...(question.media ? { media: question.media } : {}),
         ...(question.source ? { source: question.source } : {}),
@@ -326,20 +339,24 @@ export const api: any = {
   games: {
     start: async (quizId: number, gameMode: 'classic' | 'team' = 'classic') => {
       const { user, raw } = await getOwnedQuiz(quizId);
-      if (!raw.questions?.length) throw new Error('Add at least one question before hosting.');
-      let gamePin = '';
-      for (let attempt = 0; attempt < 10; attempt += 1) {
-        gamePin = String(Math.floor(100000 + Math.random() * 900000));
-        if (!(await getDoc(doc(db, 'games', gamePin))).exists()) break;
-      }
+      const quiz = normalizeQuiz(quizId, raw);
+      validateQuiz(quiz);
       const id = makeId();
       const createdAt = now();
-      await setDoc(doc(db, 'games', gamePin), {
-        id, gamePin, hostUid: user.uid, hostId: user.uid, quizId, quizTitle: raw.title,
-        quiz: normalizeQuiz(quizId, raw), gameMode, status: 'lobby', phase: 'lobby',
-        currentQuestion: -1, teams: [], createdAt, startedAt: null, endedAt: null,
-      });
-      return { gameId: id, gamePin, gameMode };
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const gamePin = String(Math.floor(100000 + Math.random() * 900000));
+        const created = await runTransaction(db, async tx => {
+          const ref = doc(db, 'games', gamePin);
+          if ((await tx.get(ref)).exists()) return false;
+          tx.set(ref, { version: 2, id, gamePin, hostUid: user.uid, hostId: user.uid, quizId, quizTitle: raw.title,
+            quiz: publicQuiz(quiz), gameMode, settings: DEFAULT_SETTINGS, status: 'lobby', phase: 'lobby',
+            currentQuestion: -1, playerCount: 0, teams: [], questionReports: [], createdAt, startedAt: null, endedAt: null, hostSeenAt: Date.now() });
+          tx.set(doc(db, 'games', gamePin, 'private', 'quiz'), quiz);
+          return true;
+        });
+        if (created) return { gameId: id, gamePin, gameMode };
+      }
+      throw new Error('Could not reserve a game PIN. Please try hosting again.');
     },
     get: async (pin: string) => {
       const snap = await getDoc(doc(db, 'games', pin));
@@ -431,7 +448,9 @@ export const api: any = {
       const item = snaps.docs.find(game => game.data().hostUid === user.uid && game.data().status === 'finished');
       if (!item) throw new Error('Report not found.');
       const game = item.data();
-      return { game: { id: game.id, game_pin: game.gamePin, quiz_title: game.quizTitle, started_at: game.startedAt, ended_at: game.endedAt, status: game.status }, results: (game.finalRankings || []).map((entry: AnyRecord) => ({ id: entry.playerId || entry.rank, total: game.quiz?.questions?.length || 0, ...entry })) };
+      const players = await getDocs(collection(db, 'games', item.id, 'players'));
+      const histories = new Map(players.docs.map(p => [p.id, p.data().history || []]));
+      return { game: { id: game.id, game_pin: game.gamePin, quiz_title: game.quizTitle, started_at: game.startedAt, ended_at: game.endedAt, status: game.status, settings: game.settings }, questions: game.questionReports || [], results: (game.finalRankings || []).map((entry: AnyRecord) => ({ id: entry.playerId || entry.rank, total: game.questionReports?.length ?? game.quiz?.questions?.length ?? 0, history: histories.get(entry.playerId) || [], ...entry })) };
     },
   },
   learning: {

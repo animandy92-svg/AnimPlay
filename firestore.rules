@@ -42,21 +42,69 @@ service cloud.firestore {
     }
 
     match /games/{pin} {
+      function game() { return get(/databases/$(database)/documents/games/$(pin)).data; }
+      function joining() {
+        let playerId = request.resource.data.lastJoinedPlayer;
+        return resource.data.status == 'lobby' && resource.data.playerCount < 100 &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['playerCount', 'lastJoinedPlayer']) &&
+          request.resource.data.playerCount == resource.data.playerCount + 1 &&
+          !exists(/databases/$(database)/documents/games/$(pin)/players/$(playerId)) &&
+          getAfter(/databases/$(database)/documents/games/$(pin)/players/$(playerId)).data.authUid == request.auth.uid;
+      }
+      function leaving() {
+        let playerId = request.resource.data.lastLeftPlayer;
+        return resource.data.status == 'lobby' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['playerCount', 'lastLeftPlayer']) &&
+          request.resource.data.playerCount == resource.data.playerCount - 1 &&
+          get(/databases/$(database)/documents/games/$(pin)/players/$(playerId)).data.authUid == request.auth.uid &&
+          !existsAfter(/databases/$(database)/documents/games/$(pin)/players/$(playerId));
+      }
       allow read: if signedIn();
       allow create: if signedIn() && request.resource.data.hostUid == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.hostUid == request.auth.uid;
+      allow update: if signedIn() && (resource.data.hostUid == request.auth.uid || joining() || leaving());
+      allow delete: if signedIn() && resource.data.hostUid == request.auth.uid;
+
+      match /private/{documentId} {
+        allow read, update, delete: if isHost(pin);
+        allow create: if signedIn() && getAfter(/databases/$(database)/documents/games/$(pin)).data.hostUid == request.auth.uid;
+      }
+
+      match /names/{nameKey} {
+        allow read: if signedIn();
+        allow create: if signedIn() && game().status == 'lobby' && request.resource.data.authUid == request.auth.uid &&
+          getAfter(/databases/$(database)/documents/games/$(pin)/players/$(request.resource.data.playerId)).data.nameKey == nameKey;
+        allow delete: if isHost(pin) || (signedIn() && resource.data.authUid == request.auth.uid &&
+          !existsAfter(/databases/$(database)/documents/games/$(pin)/players/$(resource.data.playerId)));
+      }
 
       match /players/{playerId} {
         allow read: if signedIn();
-        allow create: if signedIn() && request.resource.data.authUid == request.auth.uid;
+        allow create: if signedIn() && game().status == 'lobby' &&
+          request.resource.data.keys().hasOnly(['playerId','sessionId','nameKey','authUid','nickname','character','teamId','score','streak','correct','answeredQuestion','answerIndex','responseText','responseTimeMs','judgedQuestion','awardedPoints','judgedCorrect','history','joinedAt']) &&
+          request.resource.data.authUid == request.auth.uid && request.resource.data.playerId == playerId &&
+          request.resource.data.score == 0 && request.resource.data.correct == 0 && request.resource.data.streak == 0 &&
+          request.resource.data.history == [] && request.resource.data.answeredQuestion == null &&
+          request.resource.data.judgedQuestion == null && request.resource.data.awardedPoints == 0 &&
+          request.resource.data.judgedCorrect == false &&
+          request.resource.data.nickname is string && request.resource.data.nickname.size() > 0 && request.resource.data.nickname.size() <= 20 &&
+          request.resource.data.joinedAt == request.time &&
+          getAfter(/databases/$(database)/documents/games/$(pin)/names/$(request.resource.data.nameKey)).data.playerId == playerId &&
+          getAfter(/databases/$(database)/documents/games/$(pin)).data.lastJoinedPlayer == playerId &&
+          getAfter(/databases/$(database)/documents/games/$(pin)).data.playerCount == game().playerCount + 1;
         allow update: if isHost(pin) || (
           signedIn() && resource.data.authUid == request.auth.uid &&
-          request.resource.data.authUid == request.auth.uid &&
-          request.resource.data.score == resource.data.score &&
-          request.resource.data.correct == resource.data.correct &&
-          request.resource.data.streak == resource.data.streak
+          ((game().status == 'lobby' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teamId'])) ||
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answeredQuestion','answerIndex','responseText','responseTimeMs','submittedAt']) &&
+          game().phase == 'question' && resource.data.answeredQuestion != game().currentQuestion &&
+          request.resource.data.answeredQuestion == game().currentQuestion &&
+          request.resource.data.submittedAt == request.time &&
+          request.time.toMillis() >= game().questionStartsAt &&
+          (game().questionEndsAt == null || request.time.toMillis() <= game().questionEndsAt + 1000) &&
+          request.resource.data.answerIndex is int && request.resource.data.answerIndex >= -1 && request.resource.data.answerIndex <= 3 &&
+          request.resource.data.responseText is string && request.resource.data.responseText.size() <= 180))
         );
-        allow delete: if isHost(pin) || (signedIn() && resource.data.authUid == request.auth.uid);
+        allow delete: if isHost(pin) || (signedIn() && resource.data.authUid == request.auth.uid && game().status == 'lobby' &&
+          getAfter(/databases/$(database)/documents/games/$(pin)).data.playerCount == game().playerCount - 1);
       }
 
       match /messages/{messageId} {

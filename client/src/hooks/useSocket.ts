@@ -9,12 +9,14 @@ export function useSocket() {
     const socket = connectSocket();
     socketRef.current = socket;
 
-    socket.on('connect', () => setConnected(true));
-    socket.on('disconnect', () => setConnected(false));
+    const connected = () => setConnected(true);
+    const disconnected = () => setConnected(false);
+    socket.on('connect', connected);
+    socket.on('disconnect', disconnected);
 
     return () => {
-      socket.off('connect');
-      socket.off('disconnect');
+      socket.off('connect', connected);
+      socket.off('disconnect', disconnected);
     };
   }, []);
 

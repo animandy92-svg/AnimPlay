@@ -11,6 +11,7 @@ interface AnswerOption {
 }
 
 interface QuestionForm {
+  explanation?: string;
   id?: number;
   media?: Media;
   source?: { name: string; url: string; license: string };
@@ -63,7 +64,7 @@ export default function CreateQuiz() {
       setTitle(data.quiz.title);
       setDescription(data.quiz.description);
       setQuestions(data.quiz.questions.map((q: any) => ({
-        id: q.id, media: q.media, source: q.source,
+        id: q.id, media: q.media, source: q.source, explanation: q.explanation || '',
         question_text: q.question_text,
         timer_seconds: q.timer_seconds,
         points: q.points,
@@ -312,6 +313,9 @@ export default function CreateQuiz() {
                 </p>
               </div>
             )}
+
+            <label className="block text-sm text-gray-600 font-bold mb-2" htmlFor="answer-explanation">Explain the answer (optional)</label>
+            <textarea id="answer-explanation" maxLength={1000} value={currentQ.explanation || ''} onChange={e => setCurrentQ({ ...currentQ, explanation: e.target.value })} className="w-full p-3 border-2 border-gray-200 rounded-xl mb-4" placeholder="Help players understand why the answer is right. Shown after the round and in their recap." />
 
             <div className="flex gap-4 mb-4">
               <div>

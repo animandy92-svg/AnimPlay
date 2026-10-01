@@ -18,6 +18,7 @@ const Groups = lazy(() => import('./pages/Groups'));
 const Assignments = lazy(() => import('./pages/Assignments'));
 const Reports = lazy(() => import('./pages/Reports'));
 const ReportDetail = lazy(() => import('./pages/ReportDetail'));
+const Practice = lazy(() => import('./pages/Practice'));
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/join" element={<JoinGame />} />
+      <Route path="/practice/:id" element={<Practice />} />
       <Route path="/game/lobby" element={<Lobby />} />
       <Route path="/game/play" element={<PlayerGame />} />
       <Route path="/game/results" element={<Results />} />

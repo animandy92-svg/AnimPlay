@@ -5,9 +5,10 @@ import {
   onAuthStateChanged,
   signInAnonymously,
   setPersistence,
+  connectAuthEmulator,
   type User,
 } from 'firebase/auth';
-import { doc, getDoc, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { connectFirestoreEmulator, doc, getDoc, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 
 export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCJxEIioLgCJyhxAU4MZKJ9wDpifhDFI_I',
@@ -18,11 +19,17 @@ export const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:17856885980:web:c5960e0607b66e27793019',
 };
 
-export const firebaseApp = initializeApp(firebaseConfig);
+const useEmulators = import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true';
+export const firebaseApp = initializeApp(useEmulators ? { ...firebaseConfig, projectId: 'demo-animplay', apiKey: 'demo-api-key', authDomain: 'localhost' } : firebaseConfig);
 export const auth = getAuth(firebaseApp);
 export const db = initializeFirestore(firebaseApp, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 });
+
+if (useEmulators) {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+}
 
 void setPersistence(auth, browserLocalPersistence);
 
@@ -40,7 +47,7 @@ export function waitForAuth(): Promise<User | null> {
     });
   }
 
-  return authReadyPromise;
+  return authReadyPromise.then(() => auth.currentUser);
 }
 
 export async function requireUser(): Promise<User> {

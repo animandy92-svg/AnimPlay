@@ -15,17 +15,19 @@ interface Report {
 export default function Reports() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     loadReports();
   }, []);
 
   const loadReports = async () => {
+    setLoading(true); setError('');
     try {
       const data = await api.reports.list();
       setReports(data.reports);
-    } catch {
-      console.error('Failed to load reports');
+    } catch (err: any) {
+      setError(err.message || 'Could not load reports. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -45,6 +47,7 @@ export default function Reports() {
     <div className="section-page">
       <h1 className="font-display text-4xl text-animplay-brand mb-6">Game Reports</h1><p className="section-description">Every game tells a story. Revisit results and celebrate progress.</p>
 
+      {error && <div role="alert" className="game-notice">{error}<button className="game-link" onClick={() => void loadReports()}>Try again</button></div>}
       {loading ? (
         <div className="text-center py-12 text-gray-500">Loading...</div>
       ) : reports.length === 0 ? (

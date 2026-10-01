@@ -34,7 +34,7 @@ export default function Home() {
             Turn any room into a <span className="hero-highlight">game show.</span>
           </h1>
           <p className="mt-7 max-w-xl text-lg font-semibold leading-relaxed text-indigo-100/80 md:text-xl">
-            Build playful quizzes, invite everyone with one PIN, and watch answers, scores, and reactions appear live.
+            Build playful quizzes, invite everyone with one PIN, and watch answers, scores, and feedback appear live.
           </p>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -49,7 +49,7 @@ export default function Home() {
           <div className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-3 text-sm font-bold text-indigo-100/70">
             <span className="flex items-center gap-2"><span className="text-emerald-300">✓</span> Free to start</span>
             <span className="flex items-center gap-2"><span className="text-emerald-300">✓</span> No app download</span>
-            <span className="flex items-center gap-2"><span className="text-emerald-300">✓</span> 30 ready-to-play quizzes</span>
+            <span className="flex items-center gap-2"><span className="text-emerald-300">✓</span> 33 ready-to-play quizzes</span>
           </div>
         </div>
 

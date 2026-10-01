@@ -9,6 +9,7 @@ dist/
 
 # Firebase cache
 .firebase/
+.test-cache/
 
 # Secrets / environment
 .env

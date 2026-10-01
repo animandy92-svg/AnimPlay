@@ -1,202 +1,29 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useSocket } from '../hooks/useSocket';
-
-interface HostPlayer {
-  playerId: string;
-  nickname: string;
-  teamId?: number;
-  character?: string;
-}
-
-interface Team {
-  id: number;
-  name: string;
-  color: string;
-}
+import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { GameShell } from '../components/GameUI';
+import { useGameSession } from '../hooks/useGameSession';
+import { PLAY_STYLES, settingsFor } from '../services/gameLogic';
 
 export default function HostLobby() {
-  const [players, setPlayers] = useState<HostPlayer[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [started, setStarted] = useState(false);
-  const [showTeamForm, setShowTeamForm] = useState(false);
+  const session = useGameSession('host');
+  const { game, players, error, online, busy, pin, run, retry } = session;
   const [teamName, setTeamName] = useState('');
-  const [teamColor, setTeamColor] = useState('#E21B3C');
-  const navigate = useNavigate();
-  const { emit, on, connected } = useSocket();
-
-  const gamePin = localStorage.getItem('animplay_gamePin') || '';
-  const gameId = localStorage.getItem('animplay_gameId') || '';
-  const hostData = JSON.parse(localStorage.getItem('animplay_host') || '{}');
-
-  useEffect(() => {
-    if (!gamePin || !gameId) {
-      navigate('/dashboard');
-      return;
-    }
-
-    if (connected) {
-      emit('host-register', { gamePin, hostId: hostData.id });
-    }
-  }, [connected, emit, gamePin, gameId, hostData.id, navigate]);
-
-  useEffect(() => {
-    const unsubPlayer = on('player-joined', (data: { playerId: string; nickname: string; playerCount: number; teamId?: number; character?: string }) => {
-      setPlayers(prev => {
-        if (prev.some(player => player.playerId === data.playerId)) return prev;
-        return [...prev, { playerId: data.playerId, nickname: data.nickname, teamId: data.teamId, character: data.character }];
-      });
-    });
-
-    const unsubPlayerLeft = on('player-left', (data: { playerId: string; nickname: string; playerCount: number }) => {
-      setPlayers(prev => prev.filter(player => player.playerId !== data.playerId));
-    });
-
-    const unsubStarted = on('game-started', () => {
-      setStarted(true);
-      navigate('/host/game');
-    });
-
-  const unsubPlayerList = on('update-player-list', (updatedPlayers: { playerId: string; nickname: string; teamId?: number; character?: string }[]) => {
-    setPlayers(updatedPlayers.map((player) => ({ playerId: player.playerId, nickname: player.nickname, teamId: player.teamId, character: player.character })));
-  });
-
-    const unsubTeamCreated = on('team-created', (data: { teamId: number; name: string; color: string }) => {
-      setTeams(prev => [...prev, { id: data.teamId, name: data.name, color: data.color }]);
-    });
-
-    const unsubTeamUpdated = on('team-updated', (data: { teams: Team[] }) => {
-      setTeams(data.teams);
-    });
-
-    return () => {
-      unsubPlayer();
-      unsubPlayerLeft();
-      unsubPlayerList();
-      unsubStarted();
-      unsubTeamCreated();
-      unsubTeamUpdated();
-    };
-  }, [on, navigate]);
-
-  const handleCreateTeam = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    if (!teamName.trim()) return;
-    emit('create-team', { gamePin, name: teamName.trim(), color: teamColor });
-    setTeamName('');
-    setShowTeamForm(false);
-  }, [emit, gamePin, teamName, teamColor]);
-
-  const handleStart = useCallback(() => {
-    if (players.length === 0) {
-      alert('Wait for at least 1 player to join!');
-      return;
-    }
-    emit('host-start-game', { gameId: Number(gameId) });
-  }, [emit, gameId, players.length]);
-
-  const teamPlayers = (teamId: number) => players.filter(p => p.teamId === teamId);
-  const unassignedPlayers = players.filter(p => !p.teamId);
-
-  return (
-    <div className="min-h-screen home-shell flex flex-col items-center justify-center p-4">
-      <div className="text-center mb-8">
-        <h1 className="font-display text-4xl sm:text-5xl text-white mb-2">Game PIN</h1>
-        <div className="bg-white rounded-3xl py-8 px-16 shadow-2xl animate-pulse-glow">
-          <div className="font-display text-8xl text-animplay-purple tracking-[0.3em]">
-            {gamePin}
-          </div>
-        </div>
-        <p className="text-white/70 text-lg mt-4">
-          Go to the website and enter this PIN
-        </p>
-      </div>
-
-      <div className="w-full max-w-2xl space-y-4 mb-8">
-        <div className="bg-white/10 rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="text-white/80 font-bold">
-              Players ({players.length})
-            </div>
-            <button
-              onClick={() => setShowTeamForm(!showTeamForm)}
-              className="bg-animplay-brand text-white font-bold py-1 px-4 rounded-lg text-sm hover:bg-animplay-brand-dark transition-colors"
-            >
-              + New Team
-            </button>
-          </div>
-
-          {showTeamForm && (
-            <form onSubmit={handleCreateTeam} className="bg-white/10 rounded-xl p-4 mb-4">
-              <input
-                type="text"
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-                placeholder="Team name"
-                className="w-full py-2 px-3 rounded-lg mb-2 text-white placeholder-white/50 bg-white/10 border border-white/20 focus:border-white/40 focus:outline-none"
-              />
-              <div className="flex gap-2 mb-2">
-                {['#E21B3C', '#26890C', '#4B8BFF', '#FFA500', '#9C27B0', '#00BCD4'].map(color => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setTeamColor(color)}
-                    className={`w-8 h-8 rounded-full border-2 ${teamColor === color ? 'border-white' : 'border-transparent'}`}
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-              </div>
-              <button type="submit" className="bg-animplay-green text-white font-bold py-2 px-4 rounded-lg text-sm">
-                Create Team
-              </button>
-            </form>
-          )}
-
-          {teams.length > 0 && (
-            <div className="space-y-3 mb-4">
-              {teams.map(team => (
-                <div key={team.id} className="bg-white/10 rounded-xl p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: team.color }} />
-                    <span className="text-white font-bold">{team.name}</span>
-                    <span className="text-white/60 text-sm">({teamPlayers(team.id).length})</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {teamPlayers(team.id).map(player => (
-                      <span key={player.playerId} className="bg-white/20 text-white text-xs px-2 py-1 rounded-full">
-                        {player.character ? `${player.character} ` : ''}{player.nickname}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {unassignedPlayers.length > 0 && (
-            <div>
-              <div className="text-white/60 text-sm mb-2">Unassigned</div>
-              <div className="flex flex-wrap gap-2">
-                {unassignedPlayers.map(player => (
-                  <span key={player.playerId} className="bg-white/10 text-white/80 text-xs px-2 py-1 rounded-full">
-                    {player.character ? `${player.character} ` : ''}{player.nickname}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <button
-        onClick={handleStart}
-        disabled={players.length === 0}
-        className="bg-animplay-green text-white font-display text-2xl py-5 px-12 rounded-2xl
-                   hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-                   hover:scale-105 transform"
-      >
-        Start Game
-      </button>
-    </div>
-  );
+  const [copied, setCopied] = useState('');
+  if (game && game.status !== 'lobby') return <Navigate to="/host/game" replace />;
+  const settings = settingsFor(game?.settings);
+  const url = `${window.location.origin}/join?pin=${pin}`;
+  const copy = async () => { try { await navigator.clipboard.writeText(url); setCopied('Join link copied'); } catch { setCopied('Copy the join link shown below.'); } };
+  return <GameShell host error={error} online={online} retry={retry}>
+    <div className="game-heading"><p className="game-eyebrow">YOUR ROOM IS READY</p><h1>{game?.quizTitle || 'Opening your lobby…'}</h1><p>Share the PIN. Pick the pace. Make room for everyone.</p></div>
+    <div className="host-lobby-grid"><section className="game-card lobby-invite"><p className="game-eyebrow">GAME PIN</p><div className="big-pin">{pin || '—'}</div><p>Players join at <strong>{window.location.host}/join</strong></p><button className="game-secondary" onClick={() => void copy()} disabled={!game}>Copy join link</button><a className="join-url" href={url} target="_blank" rel="noreferrer">{url}</a><p role="status">{copied}</p>
+      <div className="lobby-player-heading"><h2>Players</h2><span>{players.length} / 100</span></div>
+      {!players.length && <p className="empty-copy">Waiting for your first player. You can open the join link on a phone or in another tab.</p>}
+      <ul className="lobby-players">{players.map(p => <li key={p.playerId}><span>{p.character} <strong>{p.nickname}</strong><small>{game?.teams?.find((t: any) => t.id === p.teamId)?.name || 'Individual'}</small></span><button disabled={busy} className="game-link" aria-label={`Remove ${p.nickname}`} onClick={() => void run('kick-player', { playerId: p.playerId })}>Remove</button></li>)}</ul>
+      <button className="game-primary" disabled={!game || !players.length || busy || !online} onClick={() => void run('host-start-game')}>{busy ? 'Please wait…' : `Start game${players.length ? ` · ${players.length} players` : ''}`}</button>
+    </section><section className="game-card"><h2>Make it your game</h2><fieldset disabled={busy || !game || !online}><legend>Choose the pace</legend><div className="play-styles">{PLAY_STYLES.map(style => <button key={style.id} aria-pressed={settings.playStyle === style.id} onClick={() => void run('game-settings', { ...settings, playStyle: style.id })}><strong>{style.title}</strong><span>{style.description}</span></button>)}</div>
+      {settings.playStyle !== 'relaxed' && <label className="setting-row">Thinking time<select value={settings.timeMultiplier} onChange={e => void run('game-settings', { ...settings, timeMultiplier: Number(e.target.value) })}><option value={1}>Standard</option><option value={1.5}>50% more time</option><option value={2}>Double time</option></select></label>}
+      <label className="setting-row"><span>Show shared leaderboard<small>Turn off for a quieter, personal progress experience.</small></span><input type="checkbox" checked={settings.showLeaderboard} onChange={e => void run('game-settings', { ...settings, showLeaderboard: e.target.checked })} /></label>
+      </fieldset><div className="team-builder"><h3>Play together</h3><p>Create optional teams. Players choose one from their lobby.</p><div className="team-chips">{game?.teams?.map((t: any) => <span key={t.id}>{t.name}</span>)}</div><form onSubmit={async e => { e.preventDefault(); if (await run('create-team', { name: teamName })) setTeamName(''); }}><input aria-label="Team name" value={teamName} maxLength={24} onChange={e => setTeamName(e.target.value)} placeholder="Team name" /><button className="game-secondary" disabled={busy || !game || !teamName.trim()}>Add team</button></form></div>
+    </section></div>
+  </GameShell>;
 }

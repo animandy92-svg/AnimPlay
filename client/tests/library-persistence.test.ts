@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from 'vitest';
-import { QUIZ_LIBRARY } from '../src/data/library';
+import { QUIZ_LIBRARY, QUIZ_LIBRARY_WITH_TOPICS } from '../src/data/library';
 const fixture = vi.hoisted(() => ({ records: new Map<string, any>(), writes: 0, user: { uid: 'library-test-host', displayName: 'Test host' } }));
 vi.mock('../src/services/firebase', () => ({ auth: { currentUser: fixture.user }, db: {}, requireUser: async () => fixture.user, isHostAccount: async () => true, waitForAuth: async () => fixture.user }));
 vi.mock('firebase/firestore', () => {
@@ -16,12 +16,12 @@ vi.mock('firebase/firestore', () => {
   };
 });
 beforeEach(() => { fixture.records.clear(); fixture.writes = 0; vi.resetModules(); });
-test('installs 30 quizzes once across concurrent reads, preserving existing work', async () => {
+test('installs the complete library once across concurrent reads, preserving existing work', async () => {
   fixture.records.set('users/library-test-host/quizzes/123', { title: 'My existing quiz', questions: [], status: 'draft' });
   const { api } = await import('../src/services/api');
   const [a,b] = await Promise.all([api.quizzes.list(),api.quizzes.list()]);
-  expect(a.quizzes).toHaveLength(31); expect(b.quizzes).toHaveLength(31);
-  expect(fixture.writes).toBe(31);
+  expect(a.quizzes).toHaveLength(QUIZ_LIBRARY_WITH_TOPICS.length + 1); expect(b.quizzes).toHaveLength(QUIZ_LIBRARY_WITH_TOPICS.length + 1);
+  expect(fixture.writes).toBe(QUIZ_LIBRARY_WITH_TOPICS.length + 2);
   expect(a.quizzes.some((q: any) => q.title === 'My existing quiz')).toBe(true);
 });
 test('trash, favorites, restore and permanent removal survive a fresh session', async () => {
@@ -32,11 +32,11 @@ test('trash, favorites, restore and permanent removal survive a fresh session', 
   await api.quizzes.delete(910001);
   expect((await api.quizzes.list('trash')).quizzes).toHaveLength(1);
   await api.quizzes.restore(910001);
-  expect((await api.quizzes.list()).quizzes).toHaveLength(30);
+  expect((await api.quizzes.list()).quizzes).toHaveLength(QUIZ_LIBRARY_WITH_TOPICS.length);
   await api.quizzes.permanentDelete(910001);
   vi.resetModules();
   const fresh = await import('../src/services/api');
-  expect((await fresh.api.quizzes.list()).quizzes).toHaveLength(29);
+  expect((await fresh.api.quizzes.list()).quizzes).toHaveLength(QUIZ_LIBRARY_WITH_TOPICS.length - 1);
 });
 test('saving a visual quiz is one write and retains media, credits and IDs through hosting', async () => {
   const { api } = await import('../src/services/api');

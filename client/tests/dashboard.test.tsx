@@ -16,7 +16,7 @@ test('shows the 30 quizzes and combines search, subject and format filters', asy
   expect(screen.queryByText('Load Sample Quiz')).toBeNull();
   await user.selectOptions(screen.getByLabelText('Question format'), 'image');
   expect(screen.getAllByRole('article')).toHaveLength(10);
-  await user.selectOptions(screen.getByLabelText('Subject'), 'science');
+  await user.selectOptions(screen.getByLabelText('Quiz category'), 'science');
   expect(screen.getAllByRole('article')).toHaveLength(1);
   await user.type(screen.getByLabelText('Search quizzes'), 'unmatched');
   expect(screen.getByText('No quizzes here just yet')).toBeTruthy();
