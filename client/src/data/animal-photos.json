@@ -1,0 +1,167 @@
+[
+  {
+    "animal": "Lion",
+    "src": "/quiz-media/animal-1.jpg",
+    "author": "Giles Laurent",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:020_The_lion_king_Snyggve_in_the_Serengeti_National_Park_Photo_by_Giles_Laurent.jpg",
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a6/020_The_lion_king_Snyggve_in_the_Serengeti_National_Park_Photo_by_Giles_Laurent.jpg/960px-020_The_lion_king_Snyggve_in_the_Serengeti_National_Park_Photo_by_Giles_Laurent.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "file": "020 The lion king Snyggve in the Serengeti National Park Photo by Giles Laurent.jpg",
+    "retrievedAt": "2026-10-03"
+  },
+  {
+    "animal": "Elephant",
+    "src": "/quiz-media/animal-2.jpg",
+    "author": "Giles Laurent",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:178_Male_African_bush_elephant_in_Etosha_National_Park_Photo_by_Giles_Laurent.jpg",
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/94/178_Male_African_bush_elephant_in_Etosha_National_Park_Photo_by_Giles_Laurent.jpg/960px-178_Male_African_bush_elephant_in_Etosha_National_Park_Photo_by_Giles_Laurent.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "file": "178 Male African bush elephant in Etosha National Park Photo by Giles Laurent.jpg",
+    "retrievedAt": "2026-10-03"
+  },
+  {
+    "animal": "Giraffe",
+    "src": "/quiz-media/animal-3.jpg",
+    "author": "Photo by David J. Stang",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Giraffa_camelopardalis_7zz.jpg",
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a8/Giraffa_camelopardalis_7zz.jpg/960px-Giraffa_camelopardalis_7zz.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "file": "Giraffa camelopardalis 7zz.jpg",
+    "retrievedAt": "2026-10-03"
+  },
+  {
+    "animal": "Zebra",
+    "src": "/quiz-media/animal-4.jpg",
+    "author": "Yathin S Krishnappa",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Equus_quagga_burchellii_-_Etosha,_2014.jpg",
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/Equus_quagga_burchellii_-_Etosha%2C_2014.jpg/960px-Equus_quagga_burchellii_-_Etosha%2C_2014.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "file": "Equus quagga burchellii - Etosha, 2014.jpg",
+    "retrievedAt": "2026-10-03"
+  },
+  {
+    "animal": "Cat",
+    "src": "/quiz-media/animal-5.jpg",
+    "author": "Karin Langner-Bahmann, upload von Martin Bahmann",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Siam_lilacpoint.jpg",
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Siam_lilacpoint.jpg/960px-Siam_lilacpoint.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "file": "Siam lilacpoint.jpg",
+    "retrievedAt": "2026-10-03"
+  },
+  {
+    "animal": "Dog",
+    "src": "/quiz-media/animal-6.jpg",
+    "author": "Dirk Vorderstraße",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Golden_Retriever_Carlos_(10581910556).jpg",
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/93/Golden_Retriever_Carlos_%2810581910556%29.jpg/960px-Golden_Retriever_Carlos_%2810581910556%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "file": "Golden Retriever Carlos (10581910556).jpg",
+    "retrievedAt": "2026-10-03"
+  },
+  {
+    "animal": "Rabbit",
+    "src": "/quiz-media/animal-7.jpg",
+    "author": "JM Ligero Loarte",
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Oryctolagus_cuniculus_Rcdo.jpg",
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1f/Oryctolagus_cuniculus_Rcdo.jpg/960px-Oryctolagus_cuniculus_Rcdo.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "file": "Oryctolagus cuniculus Rcdo.jpg",
+    "retrievedAt": "2026-10-03"
+  },
+  {
+    "animal": "Panda",
+    "src": "/quiz-media/animal-8.jpg",
+    "author": "J. Patrick Fischer",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Grosser_Panda.JPG",
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0f/Grosser_Panda.JPG/960px-Grosser_Panda.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "file": "Grosser Panda.JPG",
+    "retrievedAt": "2026-10-03"
+  },
+  {
+    "animal": "Penguin",
+    "src": "/quiz-media/animal-9.jpg",
+    "author": "Godot13",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:South_Shetland-2016-Deception_Island%E2%80%93Chinstrap_penguin_(Pygoscelis_antarctica)_04.jpg",
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/08/South_Shetland-2016-Deception_Island%E2%80%93Chinstrap_penguin_%28Pygoscelis_antarctica%29_04.jpg/960px-South_Shetland-2016-Deception_Island%E2%80%93Chinstrap_penguin_%28Pygoscelis_antarctica%29_04.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "file": "South Shetland-2016-Deception Island–Chinstrap penguin (Pygoscelis antarctica) 04.jpg",
+    "retrievedAt": "2026-10-03"
+  },
+  {
+    "animal": "Frog",
+    "src": "/quiz-media/animal-10.jpg",
+    "author": "Charlie Jackson",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Red-eyed_Leaf_Frog_(49661076226).jpg",
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f5/Red-eyed_Leaf_Frog_%2849661076226%29.jpg/960px-Red-eyed_Leaf_Frog_%2849661076226%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "file": "Red-eyed Leaf Frog (49661076226).jpg",
+    "retrievedAt": "2026-10-03"
+  },
+  {
+    "animal": "Turtle",
+    "src": "/quiz-media/animal-11.jpg",
+    "author": "Rhondle",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Red-eared_slider.jpg",
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/Red-eared_slider.jpg/960px-Red-eared_slider.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "file": "Red-eared slider.jpg",
+    "retrievedAt": "2026-10-03"
+  },
+  {
+    "animal": "Monkey",
+    "src": "/quiz-media/animal-12.jpg",
+    "author": "Deerpeter",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ubud_Monkey_Family.jpg",
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4e/Ubud_Monkey_Family.jpg/960px-Ubud_Monkey_Family.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "file": "Ubud Monkey Family.jpg",
+    "retrievedAt": "2026-10-03"
+  },
+  {
+    "animal": "Horse",
+    "src": "/quiz-media/animal-13.jpg",
+    "author": "Nokota_Horses.jpg: François Marchal derivative work: Dana boomer (talk)",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Nokota_Horses_cropped.jpg",
+    "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/d/de/Nokota_Horses_cropped.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+    "file": "Nokota Horses cropped.jpg",
+    "retrievedAt": "2026-10-03"
+  },
+  {
+    "animal": "Butterfly",
+    "src": "/quiz-media/animal-14.jpg",
+    "author": "fesoj",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Fesoj_-_Papilio_machaon_(by).jpg",
+    "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/3/3d/Fesoj_-_Papilio_machaon_%28by%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+    "file": "Fesoj - Papilio machaon (by).jpg",
+    "retrievedAt": "2026-10-03"
+  },
+  {
+    "animal": "Fish",
+    "src": "/quiz-media/animal-15.jpg",
+    "author": "לינה אבוגוש",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Gold_fish1.jpg",
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/65/Gold_fish1.jpg/960px-Gold_fish1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "file": "Gold fish1.jpg",
+    "retrievedAt": "2026-10-03"
+  }
+]

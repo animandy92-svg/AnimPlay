@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
+import { QUIZ_CATEGORIES } from '../data/library';
 
 interface DiscoverQuiz {
   id: number;
@@ -59,7 +60,7 @@ export default function Discover() {
 
   return (
     <div className="section-page">
-      <h1 className="font-display text-4xl text-animplay-brand mb-6">Discover Quizzes</h1><p className="section-description">Find your next crowd-pleaser. Explore focused categories like Flags, Countries & Capitals, and Animals.</p>
+      <h1 className="font-display text-4xl text-animplay-brand mb-6">Discover Quizzes</h1><p className="section-description">Easy quizzes, one topic at a time. Explore cars, Bible characters, capitals, flags, accounting, riddles and animal pictures.</p>
 
       <form onSubmit={handleSearch} className="flex gap-3 mb-6">
         <input
@@ -88,13 +89,13 @@ export default function Discover() {
         </button>
         {categories.map(cat => (
           <button
-            key={cat}
+            key={QUIZ_CATEGORIES[cat] || cat}
             onClick={() => setCategory(cat)}
             className={`px-4 py-2 rounded-full text-sm font-bold capitalize transition-colors ${
               category === cat ? 'bg-animplay-brand text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
             }`}
           >
-            {cat}
+            {QUIZ_CATEGORIES[cat] || cat}
           </button>
         ))}
       </div>
@@ -132,7 +133,7 @@ export default function Discover() {
               <div className="flex items-start justify-between mb-2">
                 <h3 className="font-bold text-xl text-gray-800">{quiz.title}</h3>
                 <span className="bg-animplay-brand/10 text-animplay-brand text-xs font-bold px-2 py-1 rounded-full capitalize">
-                  {quiz.category}
+                  {QUIZ_CATEGORIES[quiz.category] || quiz.category}
                 </span>
               </div>
               <p className="text-gray-500 text-sm mb-3">{quiz.description || 'No description'}</p>

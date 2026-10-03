@@ -1,4 +1,5 @@
-import { QUIZ_LIBRARY_WITH_TOPICS } from '../data/library';
+import { buildEasyQuiz, QUIZ_LIBRARY_WITH_TOPICS, upgradeAnimalMedia } from '../data/library';
+import { QUIZ_LIBRARY_WITH_TOPICS as LEGACY_LIBRARY } from '../data/library-v1';
 import { DEFAULT_SETTINGS, publicQuiz, validateQuiz } from './gameLogic';
 import {
   GoogleAuthProvider,
@@ -88,48 +89,61 @@ function normalizeQuiz(id: number, raw: AnyRecord): AnyRecord {
       correct_index: question.correct_index ?? question.correctIndex ?? 0,
       correctIndex: question.correct_index ?? question.correctIndex ?? 0,
       questionType: question.questionType || 'multiple_choice',
+      ...(question.category ? { category: question.category } : {}),
+      ...(question.difficulty ? { difficulty: question.difficulty } : {}),
       explanation: question.explanation || '',
       sortOrder: question.sortOrder ?? index,
       answers: question.answers || [],
-      ...(question.media ? { media: question.media } : {}),
+      ...(question.media ? { media: upgradeAnimalMedia(question.media) } : {}),
       ...(question.source ? { source: question.source } : {}),
     })),
   };
 }
 
 const STARTER_QUIZZES = QUIZ_LIBRARY_WITH_TOPICS;
-// Atomic marker + deterministic IDs make installation safe across tabs and retries.
-// A permanent deletion stays deleted; the collection is only installed once per user.
+// Compare content rather than timestamps: playing a quiz may update its timestamp.
+// Keep any edited, favourited, filed or trashed legacy quiz visible and intact.
+function untouchedLegacyQuiz(raw: AnyRecord, original: AnyRecord) {
+  if (raw.isFavorite || raw.folderId || raw.deletedAt) return false;
+  const canonical = (value: any): any => Array.isArray(value) ? value.map(canonical)
+    : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+  const content = (quiz: AnyRecord) => ({
+    title: quiz.title, description: quiz.description, category: quiz.category, format: quiz.format, status: quiz.status,
+    questions: (quiz.questions || []).map((q: AnyRecord) => ({
+      id: q.id, question_text: q.question_text || q.questionText, answers: q.answers,
+      correct_index: q.correct_index ?? q.correctIndex, timer_seconds: q.timer_seconds ?? q.timerSeconds,
+      points: q.points, questionType: q.questionType, explanation: q.explanation || '', media: q.media || null, source: q.source || null,
+    })),
+  });
+  return JSON.stringify(canonical(content(raw))) === JSON.stringify(canonical(content(original)));
+}
+// Atomic version marker + new deterministic IDs make upgrades safe across tabs and retries.
+// Retired originals remain available to existing assignments and direct quiz links.
 const libraryInstalls = new Map<string, Promise<void>>();
 async function ensureLibrary(uid: string) {
   if (!libraryInstalls.has(uid)) {
     const install = runTransaction(db, async transaction => {
-      const marker = doc(db, 'users', uid, 'settings', 'quiz-library-v1');
-      const topicsMarker = doc(db, 'users', uid, 'settings', 'quiz-topics-v1');
-      const topicQuizzes = QUIZ_LIBRARY_WITH_TOPICS.slice(30);
-      const [libraryInstalled, topicsInstalled, ...topicSnapshots] = await Promise.all([
-        transaction.get(marker), transaction.get(topicsMarker),
-        ...topicQuizzes.map(quiz => transaction.get(doc(db, 'users', uid, 'quizzes', String(quiz.id)))),
+      const marker = doc(db, 'users', uid, 'settings', 'quiz-library-easy-v2');
+      if ((await transaction.get(marker)).exists()) return;
+      const [currentSnapshots, legacySnapshots] = await Promise.all([
+        Promise.all(QUIZ_LIBRARY_WITH_TOPICS.map(quiz => transaction.get(doc(db, 'users', uid, 'quizzes', String(quiz.id))))),
+        Promise.all(LEGACY_LIBRARY.map(quiz => transaction.get(doc(db, 'users', uid, 'quizzes', String(quiz.id))))),
       ]);
       const timestamp = now();
-      if (!libraryInstalled.exists()) for (const quiz of QUIZ_LIBRARY_WITH_TOPICS.slice(0, 30)) {
-        transaction.set(doc(db, 'users', uid, 'quizzes', String(quiz.id)), {
+      QUIZ_LIBRARY_WITH_TOPICS.forEach((quiz, index) => {
+        if (!currentSnapshots[index].exists()) transaction.set(doc(db, 'users', uid, 'quizzes', String(quiz.id)), {
           ...quiz, ownerUid: uid, creatorName: quiz.creator_name, isPublic: false,
           isFavorite: false, folderId: null, deletedAt: null, playCount: 0,
           createdAt: timestamp, updatedAt: timestamp,
         });
-      }
-      if (!topicsInstalled.exists()) {
-        topicQuizzes.forEach((quiz, index) => {
-          if (!topicSnapshots[index].exists()) transaction.set(doc(db, 'users', uid, 'quizzes', String(quiz.id)), {
-            ...quiz, ownerUid: uid, creatorName: quiz.creator_name, isPublic: false,
-            isFavorite: false, folderId: null, deletedAt: null, playCount: 0,
-            createdAt: timestamp, updatedAt: timestamp,
-          });
-        });
-        transaction.set(topicsMarker, { installedAt: timestamp, count: 3 });
-      }
-      if (!libraryInstalled.exists()) transaction.set(marker, { installedAt: timestamp, count: 30 });
+      });
+      LEGACY_LIBRARY.forEach((quiz, index) => {
+        const snapshot = legacySnapshots[index];
+        if (snapshot.exists() && untouchedLegacyQuiz(snapshot.data(), quiz)) {
+          transaction.set(doc(db, 'users', uid, 'quizzes', String(quiz.id)), { ...snapshot.data(), libraryRetired: true });
+        }
+      });
+      transaction.set(marker, { installedAt: timestamp, count: QUIZ_LIBRARY_WITH_TOPICS.length });
     }).catch(error => { libraryInstalls.delete(uid); throw error; });
     libraryInstalls.set(uid, install);
   }
@@ -200,7 +214,7 @@ export const api: any = {
       const nextId = id || makeId();
       const cleanQuestions = questions.map((q, index) => JSON.parse(JSON.stringify({ ...q, id: q.id || makeId() + index, sortOrder: index })));
       const format = cleanQuestions.some(q => q.media?.kind === 'diagram') ? 'diagram' : cleanQuestions.some(q => q.media) ? 'image' : 'text';
-      const changes = { title: title.trim(), description: description.trim(), questions: cleanQuestions, format, status: 'published', updatedAt: timestamp };
+      const changes = { title: title.trim(), description: description.trim(), questions: cleanQuestions, format, status: 'published', libraryRetired: false, updatedAt: timestamp };
       if (id) {
         const { ref } = await getOwnedQuiz(id);
         await updateDoc(ref, changes);
@@ -219,6 +233,7 @@ export const api: any = {
       const snapshots = await getDocs(collection(db, 'users', user.uid, 'quizzes'));
       let quizzes = snapshots.docs.map(item => normalizeQuiz(Number(item.id), item.data()));
       quizzes = quizzes.filter(item => {
+        if (item.libraryRetired) return false;
         if (folderId) return !item.deleted_at && item.folderId === folderId;
         if (tab === 'trash') return Boolean(item.deleted_at);
         if (item.deleted_at) return false;
@@ -248,7 +263,7 @@ export const api: any = {
     },
     update: async (id: number, data: AnyRecord) => {
       const { ref } = await getOwnedQuiz(id);
-      const mapped: AnyRecord = { updatedAt: now() };
+      const mapped: AnyRecord = { updatedAt: now(), libraryRetired: false };
       if (data.title !== undefined) mapped.title = data.title.trim();
       if (data.description !== undefined) mapped.description = data.description.trim();
       if (data.status !== undefined) mapped.status = data.status;
@@ -261,7 +276,7 @@ export const api: any = {
     },
     delete: async (id: number) => {
       const { ref } = await getOwnedQuiz(id);
-      await updateDoc(ref, { deletedAt: now(), updatedAt: now() });
+      await updateDoc(ref, { deletedAt: now(), libraryRetired: false, updatedAt: now() });
       return { success: true };
     },
     permanentDelete: async (id: number) => {
@@ -271,7 +286,7 @@ export const api: any = {
     },
     restore: async (id: number) => {
       const { ref } = await getOwnedQuiz(id);
-      await updateDoc(ref, { deletedAt: null, updatedAt: now() });
+      await updateDoc(ref, { deletedAt: null, libraryRetired: false, updatedAt: now() });
       return { success: true };
     },
     clone: async (id: number) => {
@@ -300,40 +315,34 @@ export const api: any = {
         ...(question.media ? { media: question.media } : {}),
         ...(question.source ? { source: question.source } : {}),
       };
-      await updateDoc(ref, { questions: [...questions, next], updatedAt: now() });
+      await updateDoc(ref, { questions: [...questions, next], libraryRetired: false, updatedAt: now() });
       return { question: { id: next.id } };
     },
     updateQuestion: async (quizId: number, questionId: number, question: AnyRecord) => {
       const { ref, raw } = await getOwnedQuiz(quizId);
       const questions = (raw.questions || []).map((item: AnyRecord) => item.id === questionId ? { ...item, ...question } : item);
-      await updateDoc(ref, { questions, updatedAt: now() });
+      await updateDoc(ref, { questions, libraryRetired: false, updatedAt: now() });
       return { success: true };
     },
     deleteQuestion: async (quizId: number, questionId: number) => {
       const { ref, raw } = await getOwnedQuiz(quizId);
       const questions = (raw.questions || []).filter((item: AnyRecord) => item.id !== questionId);
-      await updateDoc(ref, { questions, updatedAt: now() });
+      await updateDoc(ref, { questions, libraryRetired: false, updatedAt: now() });
       return { success: true };
     },
     aiGenerate: async (topic: string, audience: string, count: number) => {
+      const selected = buildEasyQuiz(topic, count);
       const user = await userContext();
       const id = makeId();
-      const safeCount = Math.min(15, Math.max(3, count));
-      const stems = [`Which idea is most closely connected to ${topic}?`, `What is an important fact to remember about ${topic}?`, `Which example best demonstrates ${topic}?`, `Which statement about ${topic} should be checked first?`, `What is a useful starting point for learning ${topic}?`];
-      const questions = Array.from({ length: safeCount }, (_, index) => ({
-        id: makeId() + index, question_text: stems[index % stems.length], timer_seconds: 20,
-        points: 1000, correct_index: 0, questionType: 'multiple_choice',
-        answers: [{ text: 'Edit this with the correct answer', color: 'red' }, { text: 'Add a believable distractor', color: 'blue' }, { text: 'Add another distractor', color: 'yellow' }, { text: 'Add one final distractor', color: 'green' }],
-        sortOrder: index,
-      }));
+      const questions = selected.questions.map((q, index) => ({ ...q, id: id + index, sortOrder: index }));
       const createdAt = now();
       await setDoc(doc(db, 'users', user.uid, 'quizzes', String(id)), {
-        id, ownerUid: user.uid, title: `${topic.trim()} starter`,
-        description: `${safeCount}-question starter for ${audience}. Review answers before publishing.`,
+        ...selected, id, ownerUid: user.uid, title: selected.title,
+        description: `${count} easy questions about ${selected.title.toLowerCase()} for ${audience || 'Everyone'}.`,
         status: 'draft', isPublic: false, isFavorite: false, folderId: null, deletedAt: null,
         playCount: 0, questions, createdAt, updatedAt: createdAt,
       });
-      return { quiz: { id, title: `${topic.trim()} starter`, question_count: safeCount } };
+      return { quiz: { id, title: selected.title, question_count: questions.length } };
     },
   },
   games: {

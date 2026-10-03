@@ -49,7 +49,7 @@ export default function Home() {
           <div className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-3 text-sm font-bold text-indigo-100/70">
             <span className="flex items-center gap-2"><span className="text-emerald-300">✓</span> Free to start</span>
             <span className="flex items-center gap-2"><span className="text-emerald-300">✓</span> No app download</span>
-            <span className="flex items-center gap-2"><span className="text-emerald-300">✓</span> 33 ready-to-play quizzes</span>
+            <span className="flex items-center gap-2"><span className="text-emerald-300">✓</span> 8 easy, focused quizzes</span>
           </div>
         </div>
 

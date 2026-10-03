@@ -1,37 +1,30 @@
-# AnimPlay quiz collection
+# AnimPlay beginner quiz collection
 
-The My Quizzes workspace installs 33 editable quizzes for each signed-in host: the original 30 themed rounds plus focused Flags, Countries & Capitals, and Animals quizzes with 15 questions each (535 questions total). Existing hosts receive the three focused quizzes through a separate one-time marker that preserves existing work.
+The default library contains eight easy quizzes with 15 questions each (120 total), revised October 3, 2026. Categories are Cars & Symbols, Bible Characters, Countries & Capitals, Countries & Flags, Accounting Standards, Simple Riddles, Animal Pictures, and Everyday General Knowledge.
 
-## Content and provenance
+Every question in a quiz belongs to that quiz's named category. Bible character and capital quizzes have no unrelated picture or chart bonus rounds. All 15 flag and all 15 animal questions have relevant local pictures. Animal pictures are real photographs from Wikimedia Commons. The car quiz includes three simplified badge pictures. Questions have short wording, four choices, one correct answer, and a 30-second timer. Accounting questions cover definitions and standard subject areas with simple examples, rather than calculations.
 
-- `client/src/data/internet-questions.json`: 450 distinct questions imported from Open Trivia Database on September 29, 2026 (CC BY-SA 4.0).
-- `client/src/data/library.ts`: deterministic quiz IDs, shuffled answer positions, source metadata, and 40 original visual questions and 45 original focused-category questions.
-- `client/public/quiz-media`: ten FlagCDN national flag PNGs and ten original SVG survey charts. Survey data is fictional.
-- `client/public/quiz-sources.html`: visible source and licensing information.
-- `client/public/quiz-library.json`: downloadable adapted collection, also CC BY-SA 4.0.
+## Builder and sources
 
-Every question has a source record. Imported trivia is community-sourced, and hosts can preview and edit answers before playing. Structural validation does not independently fact-check every source answer.
+`client/src/data/library.ts` is the current question bank and category list. The quick-start builder accepts a single category and samples 5, 10, or 15 real questions from that bank, preserving answers, pictures, and credits. Unknown or mixed topic requests fail rather than silently drawing from another topic. All audience choices retain easy difficulty. The optional Express AI generator also instructs its model to keep questions easy and entirely within the requested topic.
 
-## Persistence
+Original questions are CC BY-SA 4.0. References are attached per question, including Bible passages and official accounting standard pages. Animal photographs retain their individual photographer credits and CC BY/CC BY-SA licenses in `client/src/data/animal-photos.json`, the credits page, and each question. Earlier drawing references in saved copies are upgraded for display. National flags come from FlagCDN / Flagpedia with public-domain designs. Simplified car symbols are identification illustrations; trademarks belong to their owners. Credits and downloadable question data are in `client/public/quiz-sources.html` and `client/public/quiz-library.json`.
 
-The Firebase client installs the collection in an atomic transaction with a per-user `settings/quiz-library-v1` marker. Concurrent calls share the installation promise. The marker ensures edits, trash, and permanent deletions are respected on later visits. Existing user-created quizzes are retained. No admin migration or Firestore rule changes are required.
+## Existing libraries
 
-Quiz saving updates the complete question list in one write, preserving question IDs, image/diagram metadata and source credits. Live game payloads include media for both host and player screens.
+An atomic transaction installs new quiz IDs 910200–910207 with the per-user `settings/quiz-library-easy-v2` marker. Installation promises are shared across simultaneous reads, and completed installs are not repeated after a refresh. Deletions remain deleted.
 
-## Validation and maintenance
+`client/src/data/library-v1.ts` retains the earlier collection solely for detecting untouched originals during the upgrade. Exact content comparison retires untouched earlier defaults from normal library lists without deleting their records, so existing quiz links and assignments still work. Edited, favourited, filed and trashed earlier quizzes are preserved. Permanently removed earlier quizzes are not recreated. Editing or restoring a retired quiz makes it visible again. Games already hold their own question snapshots.
+
+## Validation
 
 ```powershell
 npm test --prefix client
 node server/node_modules/tsx/dist/cli.mjs scripts/verify-library.ts
 npm run build --prefix client
+npm run build --prefix server
 ```
 
-The verifier checks collection size, unique imported questions and IDs, answer indices, media presence, document sizes, and attribution, and regenerates the downloadable JSON. Tests cover filtering, favorites, previews, one-time installation, preservation of existing quizzes, deletion across sessions, cloning and media retention when saving and hosting. Persistence tests mock Firebase; they do not create production accounts or games.
+The verifier checks all eight topics, 120 unique question IDs, valid answers, per-question topic membership, picture paths and document sizes, and regenerates the downloadable JSON. Tests cover topic isolation, builder sampling, pictures, filters, upgrade preservation, one-time installation, deletion across sessions, cloning, and media retention when saving and hosting. Firebase persistence tests use mocks; emulator gameplay tests require the separately configured emulators.
 
-`scripts/import-quizzes.mjs` is an explicit, resumable internet import with rate-limit delays. `scripts/build-quiz-media.mjs` refreshes flag files and recreates chart SVGs. Normal application startup and production builds do not request either external content service.
-
-Deploy the built frontend using the repository's configured Firebase project:
-
-```powershell
-firebase deploy --only hosting --project animplay-872d3
-```
+`scripts/build-quiz-media.mjs` refreshes flags, downloads the specifically selected animal photographs, and creates badge illustrations. It retains legacy chart files for existing quizzes. Production startup and builds need no external content services. `scripts/import-quizzes.mjs` is only for maintaining the archived specialist trivia data; it does not feed the beginner collection.

@@ -1,5 +1,6 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 import { QUIZ_LIBRARY, QUIZ_LIBRARY_WITH_TOPICS } from '../src/data/library';
+import { QUIZ_LIBRARY_WITH_TOPICS as LEGACY_LIBRARY } from '../src/data/library-v1';
 const fixture = vi.hoisted(() => ({ records: new Map<string, any>(), writes: 0, user: { uid: 'library-test-host', displayName: 'Test host' } }));
 vi.mock('../src/services/firebase', () => ({ auth: { currentUser: fixture.user }, db: {}, requireUser: async () => fixture.user, isHostAccount: async () => true, waitForAuth: async () => fixture.user }));
 vi.mock('firebase/firestore', () => {
@@ -21,26 +22,26 @@ test('installs the complete library once across concurrent reads, preserving exi
   const { api } = await import('../src/services/api');
   const [a,b] = await Promise.all([api.quizzes.list(),api.quizzes.list()]);
   expect(a.quizzes).toHaveLength(QUIZ_LIBRARY_WITH_TOPICS.length + 1); expect(b.quizzes).toHaveLength(QUIZ_LIBRARY_WITH_TOPICS.length + 1);
-  expect(fixture.writes).toBe(QUIZ_LIBRARY_WITH_TOPICS.length + 2);
+  expect(fixture.writes).toBe(QUIZ_LIBRARY_WITH_TOPICS.length + 1);
   expect(a.quizzes.some((q: any) => q.title === 'My existing quiz')).toBe(true);
 });
 test('trash, favorites, restore and permanent removal survive a fresh session', async () => {
   const { api } = await import('../src/services/api');
   await api.quizzes.list();
-  await api.quizzes.update(910001, { is_favorite: 1 });
+  await api.quizzes.update(910200, { is_favorite: 1 });
   expect((await api.quizzes.list('favorites')).quizzes).toHaveLength(1);
-  await api.quizzes.delete(910001);
+  await api.quizzes.delete(910200);
   expect((await api.quizzes.list('trash')).quizzes).toHaveLength(1);
-  await api.quizzes.restore(910001);
+  await api.quizzes.restore(910200);
   expect((await api.quizzes.list()).quizzes).toHaveLength(QUIZ_LIBRARY_WITH_TOPICS.length);
-  await api.quizzes.permanentDelete(910001);
+  await api.quizzes.permanentDelete(910200);
   vi.resetModules();
   const fresh = await import('../src/services/api');
   expect((await fresh.api.quizzes.list()).quizzes).toHaveLength(QUIZ_LIBRARY_WITH_TOPICS.length - 1);
 });
 test('saving a visual quiz is one write and retains media, credits and IDs through hosting', async () => {
   const { api } = await import('../src/services/api');
-  const original = (await api.quizzes.get(910003)).quiz;
+  const original = (await api.quizzes.get(910206)).quiz;
   const before = fixture.writes;
   await api.quizzes.save(original.id, 'Edited title', original.description, original.questions);
   expect(fixture.writes-before).toBe(1);
@@ -49,13 +50,53 @@ test('saving a visual quiz is one write and retains media, credits and IDs throu
   expect(saved.questions[0].source).toEqual(original.questions[0].source);
   expect(saved.questions[0].id).toBe(original.questions[0].id);
   const game = await api.games.start(original.id);
-  expect(fixture.records.get(`games/${game.gamePin}`).quiz.questions[0].media.kind).toBe('diagram');
+  expect(fixture.records.get(`games/${game.gamePin}`).quiz.questions[0].media.kind).toBe('image');
 });
 test('cloning preserves the full visual quiz and does not mutate the collection', async () => {
   const { api } = await import('../src/services/api');
-  const clone = await api.quizzes.clone(910002);
+  const clone = await api.quizzes.clone(910203);
   const saved = (await api.quizzes.get(clone.quiz.id)).quiz;
-  expect(saved.questions).toHaveLength(17);
+  expect(saved.questions).toHaveLength(15);
   expect(saved.questions[0].media.kind).toBe('image');
-  expect(saved.questions[0].id).not.toBe(QUIZ_LIBRARY[1].questions[0].id);
+  expect(saved.questions[0].id).not.toBe(QUIZ_LIBRARY[3].questions[0].id);
+});
+
+test('upgrades old libraries once, retiring untouched defaults while preserving user choices and links', async () => {
+  const path = 'users/library-test-host/quizzes/';
+  const legacy = (index: number) => JSON.parse(JSON.stringify(LEGACY_LIBRARY[index]));
+  fixture.records.set('users/library-test-host/settings/quiz-library-v1', { count: 30 });
+  fixture.records.set('users/library-test-host/settings/quiz-topics-v1', { count: 3 });
+  fixture.records.set(path + LEGACY_LIBRARY[0].id, legacy(0));
+  fixture.records.set(path + LEGACY_LIBRARY[1].id, { ...legacy(1), title: 'My edited picture round' });
+  const changedAnswer = legacy(2); changedAnswer.questions[0].answers[0].text = 'My new answer';
+  fixture.records.set(path + changedAnswer.id, changedAnswer);
+  fixture.records.set(path + LEGACY_LIBRARY[3].id, { ...legacy(3), isFavorite: true });
+  fixture.records.set(path + LEGACY_LIBRARY[4].id, { ...legacy(4), folderId: 123 });
+  fixture.records.set(path + LEGACY_LIBRARY[5].id, { ...legacy(5), deletedAt: '2026-10-01' });
+  const { api } = await import('../src/services/api');
+  const installed = await api.quizzes.list();
+  expect(installed.quizzes).toHaveLength(QUIZ_LIBRARY.length + 4);
+  expect(installed.quizzes.some((q: any) => q.id === LEGACY_LIBRARY[0].id)).toBe(false);
+  expect((await api.quizzes.get(LEGACY_LIBRARY[0].id)).quiz.questions).toHaveLength(15);
+  expect(fixture.records.get(path + changedAnswer.id).questions[0].answers[0].text).toBe('My new answer');
+  expect((await api.quizzes.list('trash')).quizzes).toHaveLength(1);
+  expect(fixture.records.has(path + LEGACY_LIBRARY[6].id)).toBe(false);
+  const writes = fixture.writes;
+  vi.resetModules();
+  const fresh = await import('../src/services/api');
+  expect((await fresh.api.quizzes.list()).quizzes).toHaveLength(QUIZ_LIBRARY.length + 4);
+  expect(fixture.writes).toBe(writes);
+});
+
+test('builder saves real easy questions from only the requested topic, with picture metadata', async () => {
+  const { api } = await import('../src/services/api');
+  const built = await api.quizzes.aiGenerate('Bible characters', 'Adults', 10);
+  const bible = (await api.quizzes.get(built.quiz.id)).quiz;
+  expect(bible.questions).toHaveLength(10);
+  expect(bible.category).toBe('bible-characters');
+  expect(bible.questions.every((q: any) => q.category === 'bible-characters' && q.difficulty === 'easy' && !q.media)).toBe(true);
+  const picture = await api.quizzes.aiGenerate('animals', 'Everyone', 5);
+  const animal = (await api.quizzes.get(picture.quiz.id)).quiz;
+  expect(animal.questions.every((q: any) => q.media.src.startsWith('/quiz-media/animal-'))).toBe(true);
+  await expect(api.quizzes.aiGenerate('bible and cars', 'Everyone', 5)).rejects.toThrow('every question stays on that topic');
 });
